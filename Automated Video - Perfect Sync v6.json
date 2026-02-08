@@ -474,7 +474,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// V6: Parallel FFmpeg Rendering\n// Runs all clips in the current batch in parallel\n\nconst { exec } = require('child_process');\nconst util = require('util');\nconst execPromise = util.promisify(exec);\n\nconst items = $input.all();\nconsole.log(`V6 Parallel Render: Processing ${items.length} clips simultaneously`);\n\n// Run all FFmpeg commands in parallel\nconst renderPromises = items.map(async (item, index) => {\n  const cmd = item.json.ffmpegCmd;\n  const sceneIndex = item.json.sceneIndex;\n  \n  console.log(`Starting render for scene ${sceneIndex}...`);\n  const startTime = Date.now();\n  \n  try {\n    const { stdout, stderr } = await execPromise(cmd, { maxBuffer: 50 * 1024 * 1024 });\n    const duration = ((Date.now() - startTime) / 1000).toFixed(1);\n    console.log(`Scene ${sceneIndex} completed in ${duration}s`);\n    \n    return {\n      json: {\n        ...item.json,\n        exitCode: 0,\n        stdout: stdout || '',\n        stderr: stderr || '',\n        renderTime: duration\n      }\n    };\n  } catch (error) {\n    const duration = ((Date.now() - startTime) / 1000).toFixed(1);\n    console.error(`Scene ${sceneIndex} FAILED after ${duration}s: ${error.message}`);\n    \n    return {\n      json: {\n        ...item.json,\n        exitCode: error.code || 1,\n        stdout: error.stdout || '',\n        stderr: error.stderr || error.message,\n        renderTime: duration\n      }\n    };\n  }\n});\n\n// Wait for all renders to complete\nconst results = await Promise.all(renderPromises);\n\nconsole.log(`V6 Parallel Render: All ${results.length} clips completed`);\n\nreturn results;"
+        "jsCode": "// V6: Build parallel FFmpeg command\n// Creates a shell script that runs multiple FFmpeg commands in parallel\n\nconst items = $input.all();\nconsole.log(`V6 Parallel Render: Building parallel command for ${items.length} clips`);\n\n// Build a shell command that runs all FFmpeg in parallel using & and wait\nconst commands = items.map((item, index) => {\n  const cmd = item.json.ffmpegCmd;\n  const sceneIndex = item.json.sceneIndex;\n  // Run each FFmpeg in background with &\n  return `(${cmd} && echo \"DONE:${sceneIndex}\") &`;\n});\n\n// Add wait at the end to wait for all background processes\nconst parallelCmd = commands.join('\\n') + '\\nwait\\necho \"ALL_COMPLETE\"';\n\nconsole.log(`V6: Running ${items.length} FFmpeg processes in parallel`);\n\n// Return single item with the combined command and all item data\nreturn {\n  json: {\n    parallelCmd: parallelCmd,\n    items: items.map(i => i.json),\n    clipCount: items.length\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -483,11 +483,37 @@
         9720
       ],
       "id": "4656c062-bddb-430f-b3ae-50cb8ea333d8",
-      "name": "4. Render Clips (Parallel)"
+      "name": "4. Build Parallel Command"
     },
     {
       "parameters": {
-        "jsCode": "// V6: Check all parallel render results and pass back to loop\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const result = item.json;\n  \n  if (result.exitCode !== 0) {\n    throw new Error(`FFmpeg Render Clip failed for scene ${result.sceneIndex}: ${result.stderr || 'Unknown error'}`);\n  }\n  \n  console.log(`Scene ${result.sceneIndex}: Clip rendered successfully in ${result.renderTime}s`);\n  results.push({ json: result });\n}\n\nconsole.log(`V6: Batch of ${results.length} clips completed`);\nreturn results;"
+        "command": "={{ $json.parallelCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        28540,
+        9720
+      ],
+      "id": "parallel-exec-001",
+      "name": "4b. Execute Parallel Render"
+    },
+    {
+      "parameters": {
+        "jsCode": "// V6: Process parallel render results and return items\nconst execResult = $input.first().json;\nconst buildCmd = $('4. Build Parallel Command').first().json;\n\n// Check if all completed\nif (!execResult.stdout || !execResult.stdout.includes('ALL_COMPLETE')) {\n  throw new Error(`Parallel render failed: ${execResult.stderr || 'Unknown error'}`);\n}\n\n// Count successful completions\nconst completedCount = (execResult.stdout.match(/DONE:/g) || []).length;\nconsole.log(`V6: ${completedCount}/${buildCmd.clipCount} clips completed`);\n\nif (completedCount !== buildCmd.clipCount) {\n  throw new Error(`Only ${completedCount}/${buildCmd.clipCount} clips completed`);\n}\n\n// Return all items for the loop\nconst results = buildCmd.items.map(item => ({\n  json: {\n    ...item,\n    exitCode: 0,\n    renderTime: 'parallel'\n  }\n}));\n\nconsole.log(`V6 Parallel Render: All ${results.length} clips completed successfully`);\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28664,
+        9720
+      ],
+      "id": "parallel-process-001",
+      "name": "4c. Process Parallel Results"
+    },
+    {
+      "parameters": {
+        "jsCode": "// V6: Pass parallel render results back to loop\nconst items = $input.all();\n\nconsole.log(`V6: Passing ${items.length} rendered clips back to loop`);\n\n// Simply pass through - error checking done in 4c. Process Parallel Results\nreturn items;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -2305,14 +2331,36 @@
       "main": [
         [
           {
-            "node": "4. Render Clips (Parallel)",
+            "node": "4. Build Parallel Command",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "4. Render Clips (Parallel)": {
+    "4. Build Parallel Command": {
+      "main": [
+        [
+          {
+            "node": "4b. Execute Parallel Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4b. Execute Parallel Render": {
+      "main": [
+        [
+          {
+            "node": "4c. Process Parallel Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4c. Process Parallel Results": {
       "main": [
         [
           {
