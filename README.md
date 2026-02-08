@@ -12,6 +12,7 @@ Automated video generation workflow for n8n that creates videos from images/clip
 - **Multiple Aspect Ratios** - 16:9 (YouTube), 9:16 (TikTok/Reels), 1:1 (Instagram)
 - **Preview Mode** - Fast low-quality renders for quick review
 - **Auto-Retry** - Failed jobs automatically retry up to 3 times
+- **Parallel Processing** - Render multiple clips simultaneously
 - **Google Sheets Integration** - Manage video queue via spreadsheet
 
 ## Versions
@@ -21,6 +22,7 @@ Automated video generation workflow for n8n that creates videos from images/clip
 | V3 | `Automated Video - Perfect Sync v3.json` | Original with Airtable integration |
 | V4 | `Automated Video - Perfect Sync v4.json` | Google Sheets + Custom Fonts + ASS Subtitles |
 | V5 | `Automated Video - Perfect Sync v5.json` | Preview Mode + Aspect Ratios + Auto-Retry |
+| V6 | `Automated Video - Perfect Sync v6.json` | **Parallel Clip Processing** (Recommended) |
 
 ## Requirements
 
@@ -79,6 +81,17 @@ Create a Google Sheet with these columns:
 | Retry Count | Number | Auto-updated on failures |
 | Error Message | Text | Auto-updated with error details |
 
+### V6 Additional Columns
+
+| Column | Type | Description |
+|--------|------|-------------|
+| Parallel Clips | Number | How many clips to render simultaneously (default: 3) |
+
+**Performance Tips for V6:**
+- `Parallel Clips = 3` - Safe for most servers (default)
+- `Parallel Clips = 5` - For powerful servers with 8+ CPU cores
+- `Parallel Clips = 1` - Disable parallel processing (sequential mode)
+
 ## Usage
 
 1. Add a row to your Google Sheet with:
@@ -125,7 +138,8 @@ cd Youtube-Automation---Video-Editor
 # Checkout specific version
 git checkout v3  # Original Airtable version
 git checkout v4  # Google Sheets + Custom Fonts
-git checkout v5  # Latest with all features
+git checkout v5  # Preview Mode + Aspect Ratios + Auto-Retry
+git checkout v6  # Parallel Processing (Recommended)
 
 # Return to latest
 git checkout main
