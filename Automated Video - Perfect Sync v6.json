@@ -1125,7 +1125,7 @@
     },
     {
       "parameters": {
-        "command": "=rm -rf {{ $('Get Final Path').first().json.tempDir }}"
+        "command": "=rm -rf {{ $('Get Final Path').first().json.tempDir }} && echo 'Cleanup complete: {{ $('Get Final Path').first().json.tempDir }}'"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
