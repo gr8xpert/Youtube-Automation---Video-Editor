@@ -1,0 +1,2562 @@
+{
+  "name": "Automated Video - Perfect Sync v4",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        21920,
+        9720
+      ],
+      "id": "c16ce1e8-9a79-4fd2-8e72-89b4dcb06282",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_ID",
+          "mode": "list",
+          "cachedResultName": "n8n Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        22144,
+        9720
+      ],
+      "id": "b4eaa955-9413-4fd1-81b5-9394fd35cec1",
+      "name": "Get All Records",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter for pending records\nconst items = $input.all();\nreturn items.filter(item => item.json.Status === 'Pending');"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22368,
+        9720
+      ],
+      "id": "da895e76-5f74-4455-a24e-2e1085855049",
+      "name": "Filter Pending Records"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files?q='{{ $json['Images Folder ID'] }}' in parents and (mimeType contains 'image/' or mimeType contains 'video/')&key=YOUR_GOOGLE_API_KEY&pageSize=1000&orderBy=name&fields=files(id,name,mimeType)",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        23040,
+        9528
+      ],
+      "id": "656b67e3-91e8-4166-87ef-11af510721be",
+      "name": "Get Media List from Drive"
+    },
+    {
+      "parameters": {
+        "url": "=https://drive.google.com/uc?export=download&id={{ $('Filter Pending Records').first().json['Voiceover File ID'] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "voiceover"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        24384,
+        9720
+      ],
+      "id": "3ae84311-963c-40ee-aa0e-e1e3426799c7",
+      "name": "Download Voiceover"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_OPENAI_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "voiceover"
+            },
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "response_format",
+              "value": "srt"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        24608,
+        9720
+      ],
+      "id": "e2e07375-bdb0-41c5-9a24-1eec703d3b1f",
+      "name": "Generate SRT (Whisper)"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "files",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        23264,
+        9528
+      ],
+      "id": "3403dff7-cd60-4013-b352-38dd88f60f87",
+      "name": "Split Media Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Natural sort media files by filename\nconst items = $input.all();\n\nitems.sort((a, b) => {\n  const nameA = a.json.name || '';\n  const nameB = b.json.name || '';\n  return nameA.localeCompare(nameB, undefined, {\n    numeric: true,\n    sensitivity: 'base'\n  });\n});\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        23488,
+        9528
+      ],
+      "id": "05a1654e-521b-4a18-a9fa-efcb4f053b35",
+      "name": "Sort Media Files"
+    },
+    {
+      "parameters": {
+        "amount": 0.05
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        23712,
+        9528
+      ],
+      "id": "e11a2caf-1af7-48c8-b35c-3a2826970bd2",
+      "name": "Rate Limit Pause",
+      "webhookId": "rate-limit-pause"
+    },
+    {
+      "parameters": {
+        "url": "=https://drive.google.com/uc?export=download&id={{ $json.id }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        23936,
+        9528
+      ],
+      "id": "f6ff7240-ec19-4c6d-a664-80b6367bd412",
+      "name": "Download Media Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// SCENE DETECTION - Parse SRT and create scene data\nconst srtContent = $input.item.json.data;\n\n// Configuration\nconst MIN_SCENE_DURATION = 1;\nconst MAX_SCENE_DURATION = 16;  // Back to 4 seconds for shorter scenes\nconst PAUSE_THRESHOLD = 0.5;\nconst ZERO_GAP_THRESHOLD = 0.1; // Used to detect natural vs forced splits\n\nfunction parseSRT(srtText) {\n  const blocks = srtText.trim().split('\\n\\n');\n  const subtitles = [];\n  \n  blocks.forEach(block => {\n    const lines = block.split('\\n');\n    if (lines.length >= 3) {\n      const timeMatch = lines[1].match(/(\\d{2}:\\d{2}:\\d{2},\\d{3}) --> (\\d{2}:\\d{2}:\\d{2},\\d{3})/);\n      if (timeMatch) {\n        subtitles.push({\n          index: parseInt(lines[0]),\n          startTimeRaw: timeMatch[1],\n          endTimeRaw: timeMatch[2],\n          text: lines.slice(2).join(' '),\n          startSeconds: timeToSeconds(timeMatch[1]),\n          endSeconds: timeToSeconds(timeMatch[2])\n        });\n      }\n    }\n  });\n  return subtitles;\n}\n\nfunction timeToSeconds(timeString) {\n  const [time, ms] = timeString.split(',');\n  const [hours, minutes, seconds] = time.split(':').map(Number);\n  return hours * 3600 + minutes * 60 + seconds + parseInt(ms) / 1000;\n}\n\nfunction formatSRTTime(seconds) {\n  const hrs = Math.floor(seconds / 3600);\n  const mins = Math.floor((seconds % 3600) / 60);\n  const secs = Math.floor(seconds % 60);\n  const ms = Math.floor((seconds % 1) * 1000);\n  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;\n}\n\nconst subtitles = parseSRT(srtContent);\nconst scenes = [];\nlet currentScene = null;\n\nsubtitles.forEach((sub, index) => {\n  const duration = sub.endSeconds - sub.startSeconds;\n  \n  let pauseBefore = 0;\n  if (index > 0) {\n    pauseBefore = sub.startSeconds - subtitles[index - 1].endSeconds;\n  }\n  \n  // Determine if this is a natural pause or zero-gap\n  const isNaturalPause = pauseBefore >= ZERO_GAP_THRESHOLD;\n  \n  // Split when:\n  // 1. No current scene (first subtitle)\n  // 2. Natural pause detected (≥ 0.5s)\n  // 3. Duration exceeded (will split even at zero-gap, but mark it)\n  const shouldStartNewScene = \n    !currentScene ||\n    pauseBefore >= PAUSE_THRESHOLD ||\n    currentScene.duration >= MAX_SCENE_DURATION;\n  \n  if (shouldStartNewScene) {\n    if (currentScene && currentScene.duration >= MIN_SCENE_DURATION) {\n      scenes.push(currentScene);\n    } else if (currentScene) {\n      if (scenes.length > 0) {\n        const prevScene = scenes[scenes.length - 1];\n        prevScene.endSeconds = currentScene.endSeconds;\n        prevScene.duration = prevScene.endSeconds - prevScene.startSeconds;\n        prevScene.text += ' ' + currentScene.text;\n      } else {\n        scenes.push(currentScene);\n      }\n    }\n    \n    currentScene = {\n      sceneIndex: scenes.length,\n      startSeconds: sub.startSeconds,\n      endSeconds: sub.endSeconds,\n      duration: duration,\n      text: sub.text,\n      gapBefore: pauseBefore,\n      // Track if this scene started after a natural pause\n      startedWithNaturalPause: isNaturalPause\n    };\n  } else {\n    currentScene.endSeconds = sub.endSeconds;\n    currentScene.duration = currentScene.endSeconds - currentScene.startSeconds;\n    currentScene.text += ' ' + sub.text;\n  }\n});\n\n// Push final scene\nif (currentScene) {\n  if (currentScene.duration >= MIN_SCENE_DURATION) {\n    scenes.push(currentScene);\n  } else if (scenes.length > 0) {\n    const prevScene = scenes[scenes.length - 1];\n    prevScene.endSeconds = currentScene.endSeconds;\n    prevScene.duration = prevScene.endSeconds - prevScene.startSeconds;\n    prevScene.text += ' ' + currentScene.text;\n  } else {\n    scenes.push(currentScene);\n  }\n}\n\n// Finalize scenes - determine breathing space based on NEXT scene's gap\nfor (let i = 0; i < scenes.length; i++) {\n  scenes[i].sceneIndex = i;\n  scenes[i].startTimeRaw = formatSRTTime(scenes[i].startSeconds);\n  scenes[i].endTimeRaw = formatSRTTime(scenes[i].endSeconds);\n  \n  // Check if NEXT scene starts with a natural pause\n  // If yes, THIS scene can have breathing space\n  // If no (next scene is zero-gap), THIS scene should NOT have breathing space\n  if (i < scenes.length - 1) {\n    const nextSceneGap = scenes[i + 1].gapBefore;\n    scenes[i].hasNaturalPause = nextSceneGap >= ZERO_GAP_THRESHOLD;\n  } else {\n    // Last scene always gets breathing space\n    scenes[i].hasNaturalPause = true;\n  }\n  \n  console.log(`Scene ${i}: ${scenes[i].duration.toFixed(1)}s, breath: ${scenes[i].hasNaturalPause ? 'YES' : 'NO'}, gap: ${(scenes[i].gapBefore || 0).toFixed(3)}s`);\n}\n\nconst totalDuration = scenes.length > 0 ? scenes[scenes.length - 1].endSeconds : 0;\n\n// Count scenes with/without breathing space\nconst withBreathing = scenes.filter(s => s.hasNaturalPause).length;\nconst withoutBreathing = scenes.filter(s => !s.hasNaturalPause).length;\n\nconsole.log(`\\n=== SUMMARY ===`);\nconsole.log(`Total scenes: ${scenes.length}`);\nconsole.log(`With breathing space: ${withBreathing}`);\nconsole.log(`Without breathing space (zero-gap): ${withoutBreathing}`);\nconsole.log(`Total duration: ${totalDuration.toFixed(2)}s`);\n\n// Add dialogue mapping\nconst imageDialogueMapping = scenes.map((scene, index) => ({\n  imageNumber: index + 1,\n  dialogue: scene.text.trim(),\n  duration: scene.duration.toFixed(2) + 's',\n  timestamp: `${scene.startTimeRaw} --> ${scene.endTimeRaw}`,\n  hasNaturalPause: scene.hasNaturalPause\n}));\n\nconst dialogueMappingText = imageDialogueMapping.map(item => \n  `${item.imageNumber}: ${item.dialogue}`\n).join('\\n');\n\nconsole.log('\\n=== DIALOGUE-TO-IMAGE MAPPING ===');\nconsole.log(dialogueMappingText);\nconsole.log(`\\nTotal Images Required: ${scenes.length}`);\n\nreturn {\n  json: {\n    scenes: scenes,\n    totalScenes: scenes.length,\n    totalDuration: totalDuration,\n    imageDialogueMapping: imageDialogueMapping,\n    dialogueMappingText: dialogueMappingText,\n    requiredImages: scenes.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24832,
+        9720
+      ],
+      "id": "cbb82b51-7885-47cd-ad69-cb6eb11600e7",
+      "name": "Scene Detection"
+    },
+    {
+      "parameters": {
+        "jsCode": "// SETUP: Create temp directory and prepare media file paths\nconst items = $input.all();\nconst tempDir = `/tmp/video_${Date.now()}`;\n\nreturn items.map((item, index) => {\n  const originalName = item.json.name || `file_${index}`;\n  const isVideo = /\\.(mp4|mov|avi|mkv|webm|flv|m4v)$/i.test(originalName);\n  const ext = isVideo ? 'mp4' : 'jpg';\n  const fileName = `media_${String(index).padStart(4, '0')}.${ext}`;\n  const filePath = `${tempDir}/${fileName}`;\n  \n  const binaryData = item.binary?.data || Object.values(item.binary || {})[0];\n  \n  if (!binaryData) {\n    throw new Error(`Item ${index} has no binary data`);\n  }\n  \n  return {\n    json: {\n      tempDir: tempDir,\n      mediaIndex: index,\n      originalName: originalName,\n      isVideo: isVideo,\n      fileName: fileName,\n      filePath: filePath\n    },\n    binary: {\n      data: binaryData\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24160,
+        9528
+      ],
+      "id": "965595d4-0b58-4cdf-8d11-af32e4910e7e",
+      "name": "Prepare Media Paths"
+    },
+    {
+      "parameters": {
+        "command": "=mkdir -p {{ $json.tempDir }} && echo 'Created {{ $json.tempDir }}'"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        24384,
+        9528
+      ],
+      "id": "c2129fc5-940b-423f-ad49-79b5fc23b824",
+      "name": "Create Temp Directory"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through original data after temp dir created\nreturn $('Prepare Media Paths').all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24608,
+        9528
+      ],
+      "id": "61d26866-3e1b-4595-982f-9f328c74807e",
+      "name": "Restore Media Data"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.filePath }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        24832,
+        9528
+      ],
+      "id": "09f3c181-1b81-4f22-aedf-e961134fefe9",
+      "name": "Write Media to Disk"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        25056,
+        9528
+      ],
+      "id": "52b489a4-3bf0-4cf9-8620-3aa3ff4f9e3b",
+      "name": "Aggregate Media Info"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        25280,
+        9720
+      ],
+      "id": "91b3c9a9-1ef7-47eb-a48d-22ed986f676c",
+      "name": "Merge Media + Scenes"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PREPARE VOICEOVER: Write voiceover to disk\nconst items = $input.all();\n\n// Find tempDir from media data\nlet tempDir = null;\nfor (const item of items) {\n  if (item.json.data && Array.isArray(item.json.data) && item.json.data[0]?.tempDir) {\n    tempDir = item.json.data[0].tempDir;\n    break;\n  }\n}\n\nif (!tempDir) {\n  throw new Error('Could not find tempDir from media data');\n}\n\n// Get voiceover binary\nconst voiceoverNode = $('Download Voiceover').first();\nconst voiceoverBinary = voiceoverNode.binary?.voiceover || voiceoverNode.binary?.data || Object.values(voiceoverNode.binary || {})[0];\n\nif (!voiceoverBinary) {\n  throw new Error('Voiceover binary not found');\n}\n\nreturn {\n  json: {\n    tempDir: tempDir,\n    voiceoverPath: `${tempDir}/voiceover_full.mp3`\n  },\n  binary: {\n    voiceover: voiceoverBinary\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25504,
+        9720
+      ],
+      "id": "ccda590b-dd54-48a4-86d3-5949bd9702cf",
+      "name": "Prepare Voiceover"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.voiceoverPath }}",
+        "dataPropertyName": "voiceover",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        25728,
+        9720
+      ],
+      "id": "48f0bf7e-2e1a-483d-9dd0-a68265928966",
+      "name": "Write Voiceover"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare font download command if font URL is provided\n\n// Get tempDir from previous node\nlet tempDir = null;\ntry {\n  const aggregateNode = $('Aggregate Media Info').first();\n  if (aggregateNode && aggregateNode.json.data && aggregateNode.json.data[0]) {\n    tempDir = aggregateNode.json.data[0].tempDir;\n  }\n} catch (e) {}\n\n// Fallback: try Write Media to Disk\nif (!tempDir) {\n  try {\n    tempDir = $('Write Media to Disk').first().json.tempDir;\n  } catch (e) {}\n}\n\nif (!tempDir) {\n  throw new Error('Could not find tempDir for font download');\n}\n\n// Get font URL and font name from sheet\nlet fontUrl = null;\nlet fontName = 'custom_font.ttf';\nlet subtitleFont = 'Arial';\ntry {\n  const sheetRecord = $('Filter Pending Records').first().json;\n  fontUrl = sheetRecord['Subtitle Font URL'] || null;\n  subtitleFont = sheetRecord['Subtitle Font'] || 'Arial';\n  \n  // Extract filename from URL (e.g., Allura-Regular.ttf from the URL)\n  if (fontUrl) {\n    const urlParts = fontUrl.split('/');\n    const urlFileName = urlParts[urlParts.length - 1];\n    // Decode URL encoding and clean up\n    fontName = decodeURIComponent(urlFileName).replace(/[^a-zA-Z0-9.-]/g, '_');\n    // Ensure it ends with .ttf or .otf\n    if (!fontName.match(/\\.(ttf|otf)$/i)) {\n      fontName = fontName + '.ttf';\n    }\n  }\n  console.log('Sheet values - Font:', subtitleFont, 'URL:', fontUrl);\n} catch (e) {\n  console.log('Could not get font settings from sheet:', e.message);\n}\n\nconst fontPath = `${tempDir}/${fontName}`;\n\n// Build download command\nlet downloadCmd;\nif (fontUrl && fontUrl.trim()) {\n  downloadCmd = `wget -q -O \"${fontPath}\" \"${fontUrl}\" && echo \"Font downloaded: ${fontName}\" && fc-query -f '%{family}' \"${fontPath}\" 2>/dev/null | head -1 || echo \"wget failed\"`;\n  console.log(`Will download: ${fontUrl}`);\n  console.log(`Save as: ${fontPath}`);\n} else {\n  downloadCmd = 'echo \"No custom font URL provided\"';\n  console.log('No font URL provided');\n}\n\nreturn {\n  json: {\n    tempDir: tempDir,\n    fontUrl: fontUrl,\n    fontPath: fontPath,\n    fontName: fontName,\n    subtitleFont: subtitleFont,\n    downloadCmd: downloadCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25952,
+        9720
+      ],
+      "id": "c7efac64-a0a3-4d06-a75c-b49509c46413",
+      "name": "Prepare Font Download"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.downloadCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        26176,
+        9720
+      ],
+      "id": "addcd3a2-49a5-4684-ac48-0ce519c841f9",
+      "name": "Download Font"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CREATE ATOMIC ITEMS: One item per scene with all data needed\n\n// Get scenes from Scene Detection node directly\nlet scenes = null;\ntry {\n  const sceneNode = $('Scene Detection').first();\n  if (sceneNode && sceneNode.json.scenes) {\n    scenes = sceneNode.json.scenes;\n  }\n} catch (e) {\n  console.log('Could not get scenes from Scene Detection node');\n}\n\n// Get media items from Aggregate Media Info or Write Media to Disk\nlet mediaItems = null;\nlet tempDir = null;\n\ntry {\n  const aggregateNode = $('Aggregate Media Info').first();\n  if (aggregateNode && aggregateNode.json.data) {\n    mediaItems = aggregateNode.json.data;\n    tempDir = mediaItems[0]?.tempDir;\n  }\n} catch (e) {\n  console.log('Could not get media from Aggregate Media Info');\n}\n\n// Fallback: try to get from input\nif (!mediaItems) {\n  const inputItems = $input.all();\n  for (const item of inputItems) {\n    if (item.json.data && Array.isArray(item.json.data)) {\n      mediaItems = item.json.data;\n      tempDir = item.json.data[0]?.tempDir;\n      break;\n    }\n  }\n}\n\n// Another fallback: build from Write Media to Disk\nif (!mediaItems) {\n  try {\n    const writeMediaItems = $('Write Media to Disk').all();\n    if (writeMediaItems && writeMediaItems.length > 0) {\n      mediaItems = writeMediaItems.map(item => ({\n        tempDir: item.json.tempDir,\n        filePath: item.json.fileName,\n        isVideo: item.json.isVideo || false,\n        originalName: item.json.originalName || item.json.fileName\n      }));\n      tempDir = writeMediaItems[0].json.tempDir;\n    }\n  } catch (e) {\n    console.log('Could not get from Write Media to Disk');\n  }\n}\n\nif (!scenes) {\n  throw new Error('Could not find scenes data. Check Scene Detection node output.');\n}\n\nif (!mediaItems || !tempDir) {\n  throw new Error(`Missing data: scenes=${!!scenes}, media=${!!mediaItems}, tempDir=${!!tempDir}`);\n}\n\nconst totalScenes = scenes.length;\nconst totalMedia = mediaItems.length;\n\nconsole.log(`Scenes: ${totalScenes}, Media files: ${totalMedia}`);\n\nif (totalMedia < totalScenes) {\n  throw new Error(`NOT ENOUGH MEDIA! Need ${totalScenes}, have ${totalMedia}`);\n}\n\nif (totalMedia > totalScenes) {\n  throw new Error(`TOO MANY MEDIA FILES! Need ${totalScenes}, have ${totalMedia}`);\n}\n\n// Get Google Sheets settings for subtitles\nlet sheetRecord = {};\ntry {\n  sheetRecord = $('Filter Pending Records').first().json;\n} catch (e) {}\n\n// Check for subtitle enable - handle checkbox (boolean), string 'TRUE', or truthy value\nconst subtitleEnableVal = sheetRecord['Subtitle Enable'];\nconst subtitlesEnabled = subtitleEnableVal === true || subtitleEnableVal === 'TRUE' || subtitleEnableVal === 'true' || subtitleEnableVal === 1;\n\nconst subtitleFont = sheetRecord['Subtitle Font'] || 'Arial';\nconst subtitleFontSize = parseInt(sheetRecord['Subtitle Font Size']) || 36;\nconst subtitleFontColor = sheetRecord['Subtitle Font Color'] || '#FFFFFF';\nconst subtitleBgColor = sheetRecord['Subtitle Background Color'] || '#000000';\nconst subtitlePosition = sheetRecord['Subtitle Position'] || 'bottom';\nconst subtitleOutline = sheetRecord['Subtitle Outline'] !== undefined ? parseInt(sheetRecord['Subtitle Outline']) : 2;\nconst fontUrl = sheetRecord['Subtitle Font URL'] || null;\nconst subtitleWidth = parseInt(sheetRecord['Subtitle Width']) || 90; // Width as percentage\n\n// Get font filename from Prepare Font Download node (this is the actual downloaded file name)\nlet fontFileName = null;\nlet fontFamilyName = null;\ntry {\n  const fontDownload = $('Prepare Font Download').first();\n  if (fontDownload && fontDownload.json.fontName) {\n    fontFileName = fontDownload.json.fontName;\n  }\n  // Get the actual font family name from Download Font node stdout (fc-query output)\n  const downloadResult = $('Download Font').first();\n  if (downloadResult && downloadResult.json.stdout) {\n    // stdout format: \"Font downloaded: filename.ttf\\nActualFamilyName\"\n    const lines = downloadResult.json.stdout.trim().split('\\n');\n    if (lines.length >= 2) {\n      fontFamilyName = lines[lines.length - 1].trim(); // Last line is the family name\n      console.log('Detected font family name from fc-query:', fontFamilyName);\n    }\n  }\n} catch (e) {\n  console.log('Could not get font info:', e.message);\n}\n\nconsole.log('Subtitle settings from sheet:', { subtitlesEnabled, subtitleFont, subtitleFontSize, subtitleFontColor, subtitleBgColor, subtitlePosition, subtitleOutline, subtitleWidth, fontUrl, fontFileName, fontFamilyName });\n\n// Get voiceover path\nlet voiceoverPath = null;\ntry {\n  voiceoverPath = $('Write Voiceover').first().json.fileName;\n} catch (e) {\n  voiceoverPath = `${tempDir}/voiceover_full.mp3`;\n}\n\n// Create one item per scene\nconst atomicItems = scenes.map((scene, index) => {\n  const media = mediaItems[index];\n  \n  return {\n    json: {\n      // Scene info\n      sceneIndex: index,\n      startSeconds: scene.startSeconds,\n      endSeconds: scene.endSeconds,\n      calculatedDuration: scene.duration,\n      sceneText: scene.text,\n      startTimeRaw: scene.startTimeRaw,\n      endTimeRaw: scene.endTimeRaw,\n      hasNaturalPause: scene.hasNaturalPause, // NEW: For conditional breathing space\n      \n      // Media info\n      mediaPath: media.filePath,\n      isVideo: media.isVideo || false,\n      originalName: media.originalName,\n      \n      // Paths\n      tempDir: tempDir,\n      voiceoverPath: voiceoverPath,\n      audioSegmentPath: `${tempDir}/audio_${String(index).padStart(4, '0')}.mp3`,\n      subtitlePath: `${tempDir}/sub_${String(index).padStart(4, '0')}.srt`,\n      clipOutputPath: `${tempDir}/clip_${String(index).padStart(4, '0')}.mp4`,\n      \n      // Subtitle settings\n      subtitlesEnabled: subtitlesEnabled,\n      subtitleFont: subtitleFont,\n      subtitleFontSize: subtitleFontSize,\n      subtitleFontColor: subtitleFontColor,\n      subtitleBgColor: subtitleBgColor,\n      subtitlePosition: subtitlePosition,\n      subtitleOutline: subtitleOutline,\n      fontUrl: fontUrl,\n      subtitleWidth: subtitleWidth,\n      fontFileName: fontFileName,\n      fontFamilyName: fontFamilyName,\n      \n      // Totals\n      totalScenes: totalScenes\n    }\n  };\n});\n\n// Log breathing space summary\nconst withBreathing = atomicItems.filter(i => i.json.hasNaturalPause).length;\nconst withoutBreathing = atomicItems.filter(i => !i.json.hasNaturalPause).length;\nconsole.log(`Created ${atomicItems.length} atomic items`);\nconsole.log(`  - ${withBreathing} will have breathing space`);\nconsole.log(`  - ${withoutBreathing} will have NO breathing space (zero-gap)`);\n\nreturn atomicItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        26400,
+        9720
+      ],
+      "id": "834b487b-db26-4667-ac45-f9f5bdf53467",
+      "name": "Create Atomic Items"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        26624,
+        9720
+      ],
+      "id": "57017d3a-8137-4d67-b208-ae3bf13dd4d2",
+      "name": "Loop Each Scene"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 1: Extract audio segment for this scene\nconst item = $input.first().json;\n\n// Use original start time (no offset needed with new scene detection logic)\nconst startTime = item.startSeconds;\nconst duration = item.calculatedDuration;\n\nconst extractCmd = `ffmpeg -y -i \"${item.voiceoverPath}\" -ss ${startTime.toFixed(3)} -t ${duration.toFixed(3)} -c:a libmp3lame -q:a 2 \"${item.audioSegmentPath}\"`;\n\nconsole.log(`Scene ${item.sceneIndex}: Extracting audio (${startTime.toFixed(2)}s - ${item.endSeconds.toFixed(2)}s)`);\n\nreturn {\n  json: {\n    ...item,\n    extractAudioCmd: extractCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        26848,
+        9720
+      ],
+      "id": "aad36c90-0beb-4cd0-a3ac-98315fe0e671",
+      "name": "1. Build Extract Audio Cmd"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.extractAudioCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        27072,
+        9720
+      ],
+      "id": "962ebd59-2a64-41ce-a2e5-b44530a5a6f8",
+      "name": "1. Extract Audio"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check FFmpeg exit code from Extract Audio\nconst result = $input.first().json;\nif (result.exitCode !== 0) {\n  throw new Error(`FFmpeg Extract Audio failed: ${result.stderr || 'Unknown error'}`);\n}\n\n// STEP 2: Probe audio duration\nconst item = $('1. Build Extract Audio Cmd').first().json;\n\nconst probeCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"${item.audioSegmentPath}\"`;\n\nreturn {\n  json: {\n    ...item,\n    probeCmd: probeCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27296,
+        9720
+      ],
+      "id": "5bbdef50-b6e2-4757-b7e7-4ccca1a6809e",
+      "name": "2. Build Probe Cmd"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.probeCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        27520,
+        9720
+      ],
+      "id": "8c0dbfd8-f4b0-49b1-acd1-fdfb9dbc1e4d",
+      "name": "2. Probe Duration"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check FFmpeg exit code from Probe Duration\nconst result = $input.first().json;\nif (result.exitCode !== 0) {\n  throw new Error(`FFprobe Duration failed: ${result.stderr || 'Unknown error'}`);\n}\n\n// STEP 3: Create ASS subtitle file with styling\nconst item = $('2. Build Probe Cmd').first().json;\nconst probeResult = $input.first().json;\n\nconst actualDuration = parseFloat(probeResult.stdout.trim());\n\nif (isNaN(actualDuration) || actualDuration <= 0) {\n  throw new Error(`Invalid duration: ${probeResult.stdout}`);\n}\n\nconsole.log(`Scene ${item.sceneIndex}: Probed duration = ${actualDuration.toFixed(4)}s`);\n\n// Get subtitle settings\nconst subtitleFont = item.subtitleFont || 'Arial';\nconst subtitleFontSize = parseInt(item.subtitleFontSize) || 36;\nconst subtitleFontColor = item.subtitleFontColor || '#FFFFFF';\nconst subtitleBgColor = item.subtitleBgColor || '#000000';\nconst subtitlePosition = item.subtitlePosition || 'bottom';\nconst subtitleOutline = item.subtitleOutline !== undefined ? parseInt(item.subtitleOutline) : 2;\nconst subtitleWidth = parseInt(item.subtitleWidth) || 90;\nconst fontUrl = item.fontUrl || null;\nconst fontFileName = item.fontFileName || null;\nconst fontFamilyName = item.fontFamilyName || null;\n\n// Determine the font name to use in ASS file\n// Priority: 1) fc-query detected family name, 2) filename without extension, 3) sheet value\nlet assFontName = subtitleFont; // Default to sheet value\nif (fontUrl && fontFamilyName) {\n  // Use the actual font family name detected by fc-query\n  assFontName = fontFamilyName;\n  console.log(`Using fc-query detected font family: ${assFontName}`);\n} else if (fontUrl && fontFileName) {\n  // Fallback: Remove .ttf or .otf extension to get font name for ASS\n  assFontName = fontFileName.replace(/\\.(ttf|otf)$/i, '');\n  console.log(`Using font filename as ASS fontname: ${assFontName}`);\n}\n\nconsole.log('ASS Subtitle settings:', { subtitleFont, assFontName, fontFamilyName, subtitleFontSize, subtitleFontColor, subtitleBgColor, subtitlePosition, subtitleWidth, fontUrl, fontFileName, tempDir: item.tempDir });\n\n// Calculate margins\nconst marginPercent = (100 - subtitleWidth) / 2;\nconst marginPixels = Math.round(marginPercent * 19.2);\n\n// Convert hex to ASS color format (AABBGGRR)\nfunction hexToAssColor(hex) {\n  hex = (hex || '#FFFFFF').replace('#', '').toUpperCase();\n  if (hex.length === 8) hex = hex.substring(0, 6);\n  if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];\n  const r = hex.substring(0, 2);\n  const g = hex.substring(2, 4);\n  const b = hex.substring(4, 6);\n  return `&H00${b}${g}${r}`;\n}\n\nconst primaryColor = hexToAssColor(subtitleFontColor);\nconst backColor = hexToAssColor(subtitleBgColor);\n\n// Alignment: 2=bottom center, 5=middle center, 8=top center\nlet alignment = 2;\nif (subtitlePosition === 'top') alignment = 8;\nif (subtitlePosition === 'center') alignment = 5;\n\n// Format time for ASS (H:MM:SS.CC)\nfunction formatAssTime(seconds) {\n  const hrs = Math.floor(seconds / 3600);\n  const mins = Math.floor((seconds % 3600) / 60);\n  const secs = Math.floor(seconds % 60);\n  const cs = Math.floor((seconds % 1) * 100);\n  return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;\n}\n\n// Build ASS file content\nconst assContent = `[Script Info]\nTitle: Subtitle\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,${assFontName},${subtitleFontSize},${primaryColor},${primaryColor},&H00000000,${backColor},0,0,0,0,100,100,0,0,4,${subtitleOutline},2,${alignment},${marginPixels},${marginPixels},50,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,${formatAssTime(0)},${formatAssTime(actualDuration)},Default,,0,0,0,,\\\\h\\\\h\\\\h${item.sceneText}\\\\h\\\\h\\\\h\n`;\n\n// Change file extension to .ass\nconst assPath = item.subtitlePath.replace('.srt', '.ass');\n\n// Also list fonts in tempDir for debugging\nconst writeAssCmd = `cat > \"${assPath}\" << 'ASSEOF'\n${assContent}\nASSEOF\necho \"Fonts in tempDir:\" && ls -la \"${item.tempDir}\"/*.ttf 2>/dev/null || echo \"No .ttf files found\"`;\n\nreturn {\n  json: {\n    ...item,\n    actualDuration: actualDuration,\n    assContent: assContent,\n    subtitlePath: assPath,\n    writeSrtCmd: writeAssCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27744,
+        9720
+      ],
+      "id": "01366a95-b18e-4255-a2e3-513b688286bf",
+      "name": "3. Build SRT Content"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.writeSrtCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        27968,
+        9720
+      ],
+      "id": "e3afdf5b-7c42-402e-a3fb-3d1ece13124f",
+      "name": "3. Write SRT File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 4: Build FFmpeg command - WORKING ZOOM with CONDITIONAL BREATHING SPACE\n// Uses ASS subtitle file (no force_style escaping needed!)\n\nconst item = $('3. Build SRT Content').first().json;\n\nconst audioDuration = item.actualDuration;\nconst isVideo = item.isVideo;\nconst mediaPath = item.mediaPath;\nconst audioPath = item.audioSegmentPath;\nconst subtitlePath = item.subtitlePath;\nconst outputPath = item.clipOutputPath;\n\nconst hasNaturalPause = item.hasNaturalPause !== false;\nconst BREATHING_SPACE = hasNaturalPause ? 0.4 : 0;\nconst totalDuration = audioDuration + BREATHING_SPACE;\n\nconst subtitlesEnabled = item.subtitlesEnabled;\nconst fontUrl = item.fontUrl || null;\n\nlet subtitlePart = '';\nif (subtitlesEnabled) {\n  // Simple subtitle filter - styling is in the ASS file\n  if (fontUrl) {\n    subtitlePart = `,subtitles=${subtitlePath}:fontsdir=${item.tempDir}`;\n  } else {\n    subtitlePart = `,subtitles=${subtitlePath}`;\n  }\n}\n\nlet ffmpegCmd;\n\nif (isVideo) {\n  const audioPad = BREATHING_SPACE > 0 ? `apad=pad_dur=${BREATHING_SPACE}` : 'anull';\n  const filterComplex = `[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080${subtitlePart}[v];[1:a]${audioPad}[a]`;\n  ffmpegCmd = `ffmpeg -y -loglevel error -i \"${mediaPath}\" -i \"${audioPath}\" -filter_complex \"${filterComplex}\" -map \"[v]\" -map \"[a]\" -c:v libx264 -preset medium -crf 20 -c:a aac -b:a 192k -t ${totalDuration} \"${outputPath}\"`;\n} else {\n  const zoomPercent = Math.min(totalDuration * 1, 5);\n  const zoomDirection = item.sceneIndex % 2 === 0 ? 'in' : 'out';\n  const startZoom = zoomDirection === 'in' ? 1.0 : (1.0 + zoomPercent/100);\n  const endZoom = zoomDirection === 'in' ? (1.0 + zoomPercent/100) : 1.0;\n  const frames = Math.round(totalDuration * 30);\n  const zoomFilter = `zoompan=z=${startZoom}+(${endZoom}-${startZoom})*on/${frames}:d=${frames}:s=1920x1080:fps=30`;\n  \n  const audioPad = BREATHING_SPACE > 0 ? `apad=pad_dur=${BREATHING_SPACE}` : 'anull';\n  const filterComplex = `[0:v]scale=1920x1080:force_original_aspect_ratio=increase,crop=1920:1080,${zoomFilter},setpts=PTS-STARTPTS${subtitlePart}[v];[1:a]${audioPad}[a]`;\n  ffmpegCmd = `ffmpeg -y -loglevel error -loop 1 -framerate 30 -i \"${mediaPath}\" -i \"${audioPath}\" -filter_complex \"${filterComplex}\" -map \"[v]\" -map \"[a]\" -t ${totalDuration} -r 30 -pix_fmt yuv420p -c:v libx264 -preset medium -crf 20 -c:a aac -b:a 192k \"${outputPath}\"`;\n}\n\nconsole.log(`Scene ${item.sceneIndex}: ${isVideo ? 'VIDEO' : 'IMAGE+ZOOM'} - ${totalDuration.toFixed(2)}s`);\n\nreturn {\n  json: {\n    ...item,\n    ffmpegCmd: ffmpegCmd,\n    totalDuration: totalDuration\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28192,
+        9720
+      ],
+      "id": "30485f71-0de6-4274-95f3-64284ae37cfc",
+      "name": "4. Build Clip Command"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.ffmpegCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        28416,
+        9720
+      ],
+      "id": "4656c062-bddb-430f-b3ae-50cb8ea333d8",
+      "name": "4. Render Complete Clip"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check FFmpeg exit code from Render Complete Clip\nconst result = $input.first().json;\nif (result.exitCode !== 0) {\n  throw new Error(`FFmpeg Render Clip failed: ${result.stderr || 'Unknown error'}`);\n}\n\n// Pass data back to loop\nconst item = $('4. Build Clip Command').first().json;\n\nconsole.log(`Scene ${item.sceneIndex}: Clip rendered successfully`);\n\nreturn {\n  json: item\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28640,
+        9792
+      ],
+      "id": "19727dac-b2fc-40df-af8c-af58e09956f9",
+      "name": "Continue Loop"
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD CONCAT LIST after all clips rendered\nconst atomicItems = $('Create Atomic Items').all();\n\nconst tempDir = atomicItems[0].json.tempDir;\nconst totalScenes = atomicItems[0].json.totalScenes;\n\n// Get music file ID from Google Sheets (passed through atomic items or get directly)\nlet musicFileId = null;\ntry {\n  musicFileId = $('Filter Pending Records').first().json['Music File ID'];\n} catch (e) {\n  console.log('Could not get Music File ID from Filter Pending Records');\n}\n\n// Build concat file content\nconst concatLines = [];\nfor (let i = 0; i < totalScenes; i++) {\n  concatLines.push(`file 'clip_${String(i).padStart(4, '0')}.mp4'`);\n}\n\nconst videosContent = concatLines.join('\\n');\nconst videosPath = `${tempDir}/videos.txt`;\n\nconsole.log(`Building concat list with ${totalScenes} clips`);\nconsole.log(`Music File ID: ${musicFileId}`);\n\nreturn {\n  json: {\n    tempDir: tempDir,\n    videosContent: videosContent,\n    videosPath: videosPath,\n    totalScenes: totalScenes,\n    musicFileId: musicFileId\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        26848,
+        9360
+      ],
+      "id": "cd9e2d13-1a13-41f5-a0e3-98867216f22a",
+      "name": "Build Concat List"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create binary for videos.txt\nconst item = $input.first();\nconst buffer = Buffer.from(item.json.videosContent, 'utf8');\n\nreturn {\n  json: item.json,\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'videos.txt'\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27072,
+        9360
+      ],
+      "id": "312ca95c-3b65-4b20-9972-5dc68edc8c10",
+      "name": "Create Concat Binary"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.videosPath }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        27296,
+        9360
+      ],
+      "id": "703fee5c-cf7a-4391-9a74-423ba8ec747f",
+      "name": "Write videos.txt"
+    },
+    {
+      "parameters": {
+        "command": "=cd \"{{ $json.tempDir }}\" && ffmpeg -y -f concat -safe 0 -i \"videos.txt\" -c copy \"final_no_music.mp4\" && echo \"Concatenation complete\""
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        27520,
+        9456
+      ],
+      "id": "448f5519-d5a7-4d09-b446-731967c41d93",
+      "name": "Concatenate All Clips"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check FFmpeg exit code from Concatenate All Clips\nconst result = $input.first().json;\nif (result.exitCode !== 0) {\n  throw new Error(`FFmpeg Concatenation failed: ${result.stderr || 'Unknown error'}`);\n}\n\n// Pass through data\nconst concatData = $('Write videos.txt').first().json;\nreturn {\n  json: concatData\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27744,
+        9456
+      ],
+      "id": "1f57e003-d1a2-4c7c-a902-83448c8018aa",
+      "name": "Check Concat Result"
+    },
+    {
+      "parameters": {
+        "url": "=https://drive.google.com/uc?export=download&id={{ $json.musicFileId }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "music"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        27968,
+        9456
+      ],
+      "id": "e3b355fc-34d7-424d-b8b9-4db5781e7fd3",
+      "name": "Get Background Music",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare for final assembly with optional music\nconst concatData = $('Write videos.txt').first().json;\nconst tempDir = concatData.tempDir;\n\n// Check for music\nlet musicBinary = null;\nlet hasMusic = false;\n\ntry {\n  const musicNode = $('Get Background Music').first();\n  if (musicNode?.binary) {\n    musicBinary = musicNode.binary.music || musicNode.binary.data || Object.values(musicNode.binary)[0];\n    hasMusic = !!musicBinary;\n  }\n} catch (e) {\n  console.log('No music available');\n}\n\nconst result = {\n  json: {\n    tempDir: tempDir,\n    hasMusic: hasMusic,\n    musicPath: `${tempDir}/music.mp3`,\n    concatenatedPath: `${tempDir}/final_no_music.mp4`,\n    finalOutputPath: `${tempDir}/final_video.mp4`\n  },\n  binary: {}\n};\n\nif (hasMusic && musicBinary) {\n  result.binary.music = musicBinary;\n}\n\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28192,
+        9456
+      ],
+      "id": "653fbd61-3645-42a0-825a-2432d0ce7943",
+      "name": "Prepare Final Assembly"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "music-check",
+              "leftValue": "={{ $json.hasMusic }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        28416,
+        9456
+      ],
+      "id": "ebedf07e-a220-4313-9987-b03812f1e55f",
+      "name": "Has Music?"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.musicPath }}",
+        "dataPropertyName": "music",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        28640,
+        9360
+      ],
+      "id": "1b7b1229-06f4-4d43-879d-662cc6add05c",
+      "name": "Write Music File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build command to add background music\nconst item = $input.first().json;\n\nconst addMusicCmd = `ffmpeg -y -i \"${item.concatenatedPath}\" -i \"${item.musicPath}\" -filter_complex \"[1:a]aloop=loop=-1:size=2e+09,volume=0.1[music];[0:a][music]amix=inputs=2:duration=first[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac -b:a 192k \"${item.finalOutputPath}\"`;\n\nreturn {\n  json: {\n    ...item,\n    addMusicCmd: addMusicCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28864,
+        9360
+      ],
+      "id": "2afa029b-ef43-4331-94e1-067de9cd808c",
+      "name": "Build Add Music Cmd"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.addMusicCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        29088,
+        9360
+      ],
+      "id": "d7db119d-150f-4400-8c6f-0ba89a440b0c",
+      "name": "Add Background Music"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check FFmpeg exit code from Add Background Music\nconst result = $input.first().json;\nif (result.exitCode !== 0) {\n  throw new Error(`FFmpeg Add Music failed: ${result.stderr || 'Unknown error'}`);\n}\n\n// Pass through data\nconst item = $('Build Add Music Cmd').first().json;\nreturn {\n  json: item\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29312,
+        9360
+      ],
+      "id": "c6e8e033-d13d-42f3-8948-df22c76eab8d",
+      "name": "Check Add Music Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No music - just copy concatenated to final\nconst item = $input.first().json;\n\nconst copyCmd = `cp \"${item.concatenatedPath}\" \"${item.finalOutputPath}\"`;\n\nreturn {\n  json: {\n    ...item,\n    copyCmd: copyCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29088,
+        9552
+      ],
+      "id": "ad6e2a62-b8e0-4ab6-b342-4dd730aea6db",
+      "name": "No Music - Copy"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.copyCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        29312,
+        9552
+      ],
+      "id": "814360a4-2cf9-4c44-aa3e-6667508eac51",
+      "name": "Copy Final"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get final output path\nconst items = $input.all();\n\nlet finalOutputPath = null;\nlet tempDir = null;\n\nfor (const item of items) {\n  if (item.json.finalOutputPath) {\n    finalOutputPath = item.json.finalOutputPath;\n    tempDir = item.json.tempDir;\n    break;\n  }\n}\n\nif (!finalOutputPath) {\n  throw new Error('Could not find final output path');\n}\n\nreturn {\n  json: {\n    finalOutputPath: finalOutputPath,\n    tempDir: tempDir\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29760,
+        9456
+      ],
+      "id": "03a4241b-3588-4669-ba63-6ec5f38b6936",
+      "name": "Get Final Path"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.finalOutputPath }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        29984,
+        9456
+      ],
+      "id": "cca223b9-f3da-4cdd-b5ad-3275deeb54fa",
+      "name": "Read Final Video"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare for upload\nconst recordName = $('Filter Pending Records').first().json.Name || 'video';\nconst timestamp = Date.now();\nconst fileName = `${recordName}_${timestamp}.mp4`;\nconst tempDir = $('Get Final Path').first().json.tempDir;\n\nreturn {\n  json: {\n    fileName: fileName,\n    tempDir: tempDir\n  },\n  binary: $input.first().binary\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        30208,
+        9456
+      ],
+      "id": "1934b47b-3f8c-4c46-82d4-2b9e072b30e9",
+      "name": "Prepare Upload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $('Prepare Upload').first().json.fileName }}\",\n  \"parents\": [\"1qEYLvvReHfzWGoy91jCpx99wuefS1pnk\"]\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        30880,
+        9456
+      ],
+      "id": "c1b34f57-2a85-46df-a707-7e807a751410",
+      "name": "Get Upload URL",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const uploadUrl = $input.first().json.headers.location;\nconst binaryData = $('Prepare Upload').first().binary;\n\nreturn {\n  json: { uploadUrl: uploadUrl },\n  binary: binaryData\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31104,
+        9456
+      ],
+      "id": "6bdbf00f-d448-4436-a97c-86b3aa0c9ad4",
+      "name": "Prep Upload Binary"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.uploadUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "video/mp4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        31328,
+        9456
+      ],
+      "id": "3b65552d-01e6-4bfc-a787-be7291e73241",
+      "name": "Upload Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/permissions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"role\": \"reader\",\n  \"type\": \"anyone\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        31552,
+        9456
+      ],
+      "id": "6cdee8dc-ec97-46f0-8341-fd04a091d3bd",
+      "name": "Set Public Permissions",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare final update data\nconst record = $('Filter Pending Records').first().json;\nconst fileId = $('Upload Video').first().json.id;\nconst outputUrl = `https://drive.google.com/file/d/${fileId}/view`;\n\nreturn {\n  json: {\n    Name: record.Name,\n    Status: 'Complete',\n    'Output URL': outputUrl\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31776,
+        9456
+      ],
+      "id": "6aa8306b-922a-4481-971c-f4e24240387c",
+      "name": "Prepare Sheets Update"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_ID",
+          "mode": "list",
+          "cachedResultName": "n8n Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "={{ $json.Status }}",
+            "Name": "={{ $json.Name }}",
+            "Output URL": "={{ $json['Output URL'] }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Images Folder ID",
+              "displayName": "Images Folder ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Voiceover File ID",
+              "displayName": "Voiceover File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Music File ID",
+              "displayName": "Music File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Output URL",
+              "displayName": "Output URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Processing Time",
+              "displayName": "Processing Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Enable",
+              "displayName": "Subtitle Enable",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font",
+              "displayName": "Subtitle Font",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font URL",
+              "displayName": "Subtitle Font URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font Size",
+              "displayName": "Subtitle Font Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font Color",
+              "displayName": "Subtitle Font Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Background Color",
+              "displayName": "Subtitle Background Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Position",
+              "displayName": "Subtitle Position",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Width",
+              "displayName": "Subtitle Width",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Outline",
+              "displayName": "Subtitle Outline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        32000,
+        9456
+      ],
+      "id": "26911aff-8a5c-4ad1-bf59-f27967617133",
+      "name": "Update Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=rm -rf {{ $('Get Final Path').first().json.tempDir }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        32224,
+        9456
+      ],
+      "id": "c9a493e7-8237-4b89-b741-3c50d21033d7",
+      "name": "Cleanup Temp Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get data from whichever branch executed\nlet finalOutputPath = null;\nlet tempDir = null;\n\n// Try to get from \"Check Add Music Result\" (music path)\ntry {\n  const musicResult = $('Check Add Music Result').first();\n  if (musicResult?.json) {\n    finalOutputPath = musicResult.json.finalOutputPath;\n    tempDir = musicResult.json.tempDir;\n  }\n} catch (e) {}\n\n// If not found, try \"Copy Final\" (no music path)\nif (!finalOutputPath) {\n  try {\n    const copyResult = $('Copy Final').first();\n    if (copyResult?.json) {\n      finalOutputPath = copyResult.json.finalOutputPath;\n      tempDir = copyResult.json.tempDir;\n    }\n  } catch (e) {}\n}\n\n// Fallback - get from Prepare Final Assembly\nif (!finalOutputPath) {\n  const prepResult = $('Prepare Final Assembly').first();\n  finalOutputPath = prepResult.json.finalOutputPath;\n  tempDir = prepResult.json.tempDir;\n}\n\nreturn {\n  json: {\n    finalOutputPath: finalOutputPath,\n    tempDir: tempDir\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29536,
+        9456
+      ],
+      "id": "5784518a-2282-49e5-b8ef-8b3ac7e653d1",
+      "name": "Merge Final Paths"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all scenes from the input\nconst scenes = $input.first().json.scenes;\n\n// Extract text from all scenes\nconst allTexts = scenes.map(scene => scene.text).join('\\n\\n');\n\n// Or if you want them as separate items\nreturn scenes.map(scene => ({\n  json: {\n    text: scene.text\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25056,
+        9720
+      ],
+      "id": "ae49c251-1a27-4ca6-9a47-cac610f38b4a",
+      "name": "Dialogues for Prompts"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update status to Processing when workflow starts\nconst record = $input.first().json;\nreturn {\n  json: {\n    Name: record.Name,\n    Status: 'Processing'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22592,
+        9720
+      ],
+      "id": "110f4613-bec4-48df-947b-b9b133c37fc7",
+      "name": "Set Status Processing"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_ID",
+          "mode": "list",
+          "cachedResultName": "n8n Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.Name }}",
+            "Status": "={{ $json.Status }}",
+            "Subtitle Outline": "={{ $('Get All Records').item.json['Subtitle Outline'] }}",
+            "Subtitle Width": "={{ $('Get All Records').item.json['Subtitle Width'] }}",
+            "Subtitle Position": "={{ $('Get All Records').item.json['Subtitle Position'] }}",
+            "Subtitle Background Color": "={{ $('Get All Records').item.json['Subtitle Background Color'] }}",
+            "Subtitle Font Color": "={{ $('Get All Records').item.json['Subtitle Font Color'] }}",
+            "Subtitle Font Size": "={{ $('Get All Records').item.json['Subtitle Font Size'] }}",
+            "Subtitle Font URL": "={{ $('Get All Records').item.json['Subtitle Font URL'] }}",
+            "Subtitle Font": "={{ $('Get All Records').item.json['Subtitle Font'] }}",
+            "Subtitle Enable": "={{ $('Get All Records').item.json['Subtitle Enable'] }}",
+            "Processing Time": "={{ $('Get All Records').item.json['Processing Time'] }}",
+            "Output URL": "={{ $('Get All Records').item.json['Output URL'] }}",
+            "Music File ID": "={{ $('Get All Records').item.json['Music File ID'] }}",
+            "Voiceover File ID": "={{ $('Get All Records').item.json['Voiceover File ID'] }}",
+            "Images Folder ID": "={{ $('Get All Records').item.json['Images Folder ID'] }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Images Folder ID",
+              "displayName": "Images Folder ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Voiceover File ID",
+              "displayName": "Voiceover File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Music File ID",
+              "displayName": "Music File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Output URL",
+              "displayName": "Output URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Processing Time",
+              "displayName": "Processing Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Enable",
+              "displayName": "Subtitle Enable",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subtitle Font",
+              "displayName": "Subtitle Font",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Font URL",
+              "displayName": "Subtitle Font URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Font Size",
+              "displayName": "Subtitle Font Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Font Color",
+              "displayName": "Subtitle Font Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Background Color",
+              "displayName": "Subtitle Background Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Position",
+              "displayName": "Subtitle Position",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Width",
+              "displayName": "Subtitle Width",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subtitle Outline",
+              "displayName": "Subtitle Outline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        22816,
+        9720
+      ],
+      "id": "e4f81f19-752e-4778-ae4b-5f5f409e6085",
+      "name": "Update Status - Processing",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update status to Finalizing before concat/music\nconst record = $('Filter Pending Records').first().json;\nreturn {\n  json: {\n    Name: record.Name,\n    Status: 'Finalizing'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27520,
+        9264
+      ],
+      "id": "d21ef0a2-4761-4dcc-92ab-ef24cbdb69cd",
+      "name": "Set Status Finalizing"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_ID",
+          "mode": "list",
+          "cachedResultName": "n8n Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.Name }}",
+            "Status": "={{ $json.Status }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Images Folder ID",
+              "displayName": "Images Folder ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Voiceover File ID",
+              "displayName": "Voiceover File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Music File ID",
+              "displayName": "Music File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Output URL",
+              "displayName": "Output URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Processing Time",
+              "displayName": "Processing Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Enable",
+              "displayName": "Subtitle Enable",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font",
+              "displayName": "Subtitle Font",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font URL",
+              "displayName": "Subtitle Font URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font Size",
+              "displayName": "Subtitle Font Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font Color",
+              "displayName": "Subtitle Font Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Background Color",
+              "displayName": "Subtitle Background Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Position",
+              "displayName": "Subtitle Position",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Width",
+              "displayName": "Subtitle Width",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Outline",
+              "displayName": "Subtitle Outline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        27744,
+        9264
+      ],
+      "id": "86aa26cd-d914-4ded-b648-e02adfafcf3a",
+      "name": "Update Status - Finalizing",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update status to Uploading before upload\nconst record = $('Filter Pending Records').first().json;\nreturn {\n  json: {\n    Name: record.Name,\n    Status: 'Uploading'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        30432,
+        9456
+      ],
+      "id": "0025e6b1-fc27-44a5-a1ac-7c334e26e1d9",
+      "name": "Set Status Uploading"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEETS_ID",
+          "mode": "list",
+          "cachedResultName": "n8n Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEETS_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.Name }}",
+            "Status": "={{ $json.Status }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Images Folder ID",
+              "displayName": "Images Folder ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Voiceover File ID",
+              "displayName": "Voiceover File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Music File ID",
+              "displayName": "Music File ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Output URL",
+              "displayName": "Output URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Processing Time",
+              "displayName": "Processing Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Enable",
+              "displayName": "Subtitle Enable",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font",
+              "displayName": "Subtitle Font",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font URL",
+              "displayName": "Subtitle Font URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font Size",
+              "displayName": "Subtitle Font Size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Font Color",
+              "displayName": "Subtitle Font Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Background Color",
+              "displayName": "Subtitle Background Color",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Position",
+              "displayName": "Subtitle Position",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Width",
+              "displayName": "Subtitle Width",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Subtitle Outline",
+              "displayName": "Subtitle Outline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        30656,
+        9456
+      ],
+      "id": "2a410f51-3b01-49e9-ad4f-3d90224afdbe",
+      "name": "Update Status - Uploading",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Get All Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Records": {
+      "main": [
+        [
+          {
+            "node": "Filter Pending Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Pending Records": {
+      "main": [
+        [
+          {
+            "node": "Set Status Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status Processing": {
+      "main": [
+        [
+          {
+            "node": "Update Status - Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status - Processing": {
+      "main": [
+        [
+          {
+            "node": "Get Media List from Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Media List from Drive": {
+      "main": [
+        [
+          {
+            "node": "Split Media Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Generate SRT (Whisper)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate SRT (Whisper)": {
+      "main": [
+        [
+          {
+            "node": "Scene Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Media Files": {
+      "main": [
+        [
+          {
+            "node": "Sort Media Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Media Files": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Pause": {
+      "main": [
+        [
+          {
+            "node": "Download Media Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Media Files": {
+      "main": [
+        [
+          {
+            "node": "Prepare Media Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Media Paths": {
+      "main": [
+        [
+          {
+            "node": "Create Temp Directory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Temp Directory": {
+      "main": [
+        [
+          {
+            "node": "Restore Media Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Media Data": {
+      "main": [
+        [
+          {
+            "node": "Write Media to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Media to Disk": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Media Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Media Info": {
+      "main": [
+        [
+          {
+            "node": "Merge Media + Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scene Detection": {
+      "main": [
+        [
+          {
+            "node": "Dialogues for Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Media + Scenes": {
+      "main": [
+        [
+          {
+            "node": "Prepare Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Write Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Prepare Font Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Font Download": {
+      "main": [
+        [
+          {
+            "node": "Download Font",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Font": {
+      "main": [
+        [
+          {
+            "node": "Create Atomic Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Atomic Items": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Scene",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Each Scene": {
+      "main": [
+        [
+          {
+            "node": "Build Concat List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "1. Build Extract Audio Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Build Extract Audio Cmd": {
+      "main": [
+        [
+          {
+            "node": "1. Extract Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Extract Audio": {
+      "main": [
+        [
+          {
+            "node": "2. Build Probe Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Build Probe Cmd": {
+      "main": [
+        [
+          {
+            "node": "2. Probe Duration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Probe Duration": {
+      "main": [
+        [
+          {
+            "node": "3. Build SRT Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Build SRT Content": {
+      "main": [
+        [
+          {
+            "node": "3. Write SRT File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Write SRT File": {
+      "main": [
+        [
+          {
+            "node": "4. Build Clip Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Build Clip Command": {
+      "main": [
+        [
+          {
+            "node": "4. Render Complete Clip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Render Complete Clip": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Scene",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Concat List": {
+      "main": [
+        [
+          {
+            "node": "Create Concat Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Concat Binary": {
+      "main": [
+        [
+          {
+            "node": "Write videos.txt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write videos.txt": {
+      "main": [
+        [
+          {
+            "node": "Concatenate All Clips",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Status Finalizing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status Finalizing": {
+      "main": [
+        [
+          {
+            "node": "Update Status - Finalizing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concatenate All Clips": {
+      "main": [
+        [
+          {
+            "node": "Check Concat Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Concat Result": {
+      "main": [
+        [
+          {
+            "node": "Get Background Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Background Music": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Assembly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Assembly": {
+      "main": [
+        [
+          {
+            "node": "Has Music?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Music?": {
+      "main": [
+        [
+          {
+            "node": "Write Music File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Music - Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Music File": {
+      "main": [
+        [
+          {
+            "node": "Build Add Music Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Add Music Cmd": {
+      "main": [
+        [
+          {
+            "node": "Add Background Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Background Music": {
+      "main": [
+        [
+          {
+            "node": "Check Add Music Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Add Music Result": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Music - Copy": {
+      "main": [
+        [
+          {
+            "node": "Copy Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copy Final": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Final Path": {
+      "main": [
+        [
+          {
+            "node": "Read Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Final Video": {
+      "main": [
+        [
+          {
+            "node": "Prepare Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Upload": {
+      "main": [
+        [
+          {
+            "node": "Set Status Uploading",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status Uploading": {
+      "main": [
+        [
+          {
+            "node": "Update Status - Uploading",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status - Uploading": {
+      "main": [
+        [
+          {
+            "node": "Get Upload URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Upload URL": {
+      "main": [
+        [
+          {
+            "node": "Prep Upload Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Upload Binary": {
+      "main": [
+        [
+          {
+            "node": "Upload Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Video": {
+      "main": [
+        [
+          {
+            "node": "Set Public Permissions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Public Permissions": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sheets Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Sheets Update": {
+      "main": [
+        [
+          {
+            "node": "Update Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Temp Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Final Paths": {
+      "main": [
+        [
+          {
+            "node": "Get Final Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dialogues for Prompts": {
+      "main": [
+        [
+          {
+            "node": "Merge Media + Scenes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6ab16758-4134-45ab-9730-2f2100349588",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "510dc0afdd5ec9c3843be833c714a2623974a2058ec95eb59daf867d1c4b0dcb"
+  },
+  "id": "s99bFRuDMKwpTRoB",
+  "tags": []
+}
