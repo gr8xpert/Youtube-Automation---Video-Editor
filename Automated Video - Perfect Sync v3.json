@@ -1,0 +1,1537 @@
+{
+  "name": "Automated Video - Perfect Sync v3",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -7056,
+        -3072
+      ],
+      "id": "955921d8-48c5-45be-a895-2d397c2b934c",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appTI2ZOHmYYoCd4g",
+          "mode": "list",
+          "cachedResultName": "Video Automation",
+          "cachedResultUrl": "https://airtable.com/appTI2ZOHmYYoCd4g"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl1nDvreMUON4Vu4",
+          "mode": "list",
+          "cachedResultName": "Videos",
+          "cachedResultUrl": "https://airtable.com/appTI2ZOHmYYoCd4g/tbl1nDvreMUON4Vu4"
+        },
+        "filterByFormula": "{Status} = 'Pending'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -6832,
+        -3072
+      ],
+      "id": "c39b10b8-0d29-49b7-881c-c3d3ccba514a",
+      "name": "Search Pending Records",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "sfvRD1bBBp1Woi28",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files?q='{{ $json['Images Folder ID'] }}' in parents and (mimeType contains 'image/' or mimeType contains 'video/')&key=YOUR_GOOGLE_API_KEY&pageSize=1000&orderBy=name&fields=files(id,name,mimeType)",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -6608,
+        -3072
+      ],
+      "id": "62ca7bca-98b9-4813-ab8d-47dfae37cf4a",
+      "name": "Get Media List from Drive"
+    },
+    {
+      "parameters": {
+        "url": "=https://drive.google.com/uc?export=download&id={{ $('Search Pending Records').item.json['Voiceover File ID'] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "voiceover"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -7056,
+        -2912
+      ],
+      "id": "ea75f8e6-4052-4fc6-8e98-89585df9488a",
+      "name": "Download Voiceover"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_OPENAI_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "voiceover"
+            },
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "response_format",
+              "value": "srt"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -6832,
+        -2912
+      ],
+      "id": "987fbbd8-357b-47d7-ab3c-9fb336b82e62",
+      "name": "Generate SRT (Whisper)"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "files",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -6384,
+        -3072
+      ],
+      "id": "1eeb5ccc-94ce-49c7-9b7b-2e61b830699d",
+      "name": "Split Media Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Natural sort media files by filename\nconst items = $input.all();\n\nitems.sort((a, b) => {\n  const nameA = a.json.name || '';\n  const nameB = b.json.name || '';\n  return nameA.localeCompare(nameB, undefined, {\n    numeric: true,\n    sensitivity: 'base'\n  });\n});\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6160,
+        -3072
+      ],
+      "id": "f6fcfca8-b4a2-4a9f-81cb-391d5c931266",
+      "name": "Sort Media Files"
+    },
+    {
+      "parameters": {
+        "amount": 0.1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -5936,
+        -3072
+      ],
+      "id": "7990fbec-f552-4492-a89f-c7de027511b4",
+      "name": "Rate Limit Pause",
+      "webhookId": "rate-limit-pause"
+    },
+    {
+      "parameters": {
+        "url": "=https://drive.google.com/uc?export=download&id={{ $json.id }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -5712,
+        -3072
+      ],
+      "id": "88d29732-dd96-482d-8c21-108043ee8796",
+      "name": "Download Media Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// SCENE DETECTION - Parse SRT and create scene data\nconst srtContent = $input.item.json.data;\n\n// Configuration\nconst MIN_SCENE_DURATION = 1;\nconst MAX_SCENE_DURATION = 16;  // Back to 4 seconds for shorter scenes\nconst PAUSE_THRESHOLD = 0.5;\nconst ZERO_GAP_THRESHOLD = 0.1; // Used to detect natural vs forced splits\n\nfunction parseSRT(srtText) {\n  const blocks = srtText.trim().split('\\n\\n');\n  const subtitles = [];\n  \n  blocks.forEach(block => {\n    const lines = block.split('\\n');\n    if (lines.length >= 3) {\n      const timeMatch = lines[1].match(/(\\d{2}:\\d{2}:\\d{2},\\d{3}) --> (\\d{2}:\\d{2}:\\d{2},\\d{3})/);\n      if (timeMatch) {\n        subtitles.push({\n          index: parseInt(lines[0]),\n          startTimeRaw: timeMatch[1],\n          endTimeRaw: timeMatch[2],\n          text: lines.slice(2).join(' '),\n          startSeconds: timeToSeconds(timeMatch[1]),\n          endSeconds: timeToSeconds(timeMatch[2])\n        });\n      }\n    }\n  });\n  return subtitles;\n}\n\nfunction timeToSeconds(timeString) {\n  const [time, ms] = timeString.split(',');\n  const [hours, minutes, seconds] = time.split(':').map(Number);\n  return hours * 3600 + minutes * 60 + seconds + parseInt(ms) / 1000;\n}\n\nfunction formatSRTTime(seconds) {\n  const hrs = Math.floor(seconds / 3600);\n  const mins = Math.floor((seconds % 3600) / 60);\n  const secs = Math.floor(seconds % 60);\n  const ms = Math.floor((seconds % 1) * 1000);\n  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;\n}\n\nconst subtitles = parseSRT(srtContent);\nconst scenes = [];\nlet currentScene = null;\n\nsubtitles.forEach((sub, index) => {\n  const duration = sub.endSeconds - sub.startSeconds;\n  \n  let pauseBefore = 0;\n  if (index > 0) {\n    pauseBefore = sub.startSeconds - subtitles[index - 1].endSeconds;\n  }\n  \n  // Determine if this is a natural pause or zero-gap\n  const isNaturalPause = pauseBefore >= ZERO_GAP_THRESHOLD;\n  \n  // Split when:\n  // 1. No current scene (first subtitle)\n  // 2. Natural pause detected (≥ 0.5s)\n  // 3. Duration exceeded (will split even at zero-gap, but mark it)\n  const shouldStartNewScene = \n    !currentScene ||\n    pauseBefore >= PAUSE_THRESHOLD ||\n    currentScene.duration >= MAX_SCENE_DURATION;\n  \n  if (shouldStartNewScene) {\n    if (currentScene && currentScene.duration >= MIN_SCENE_DURATION) {\n      scenes.push(currentScene);\n    } else if (currentScene) {\n      if (scenes.length > 0) {\n        const prevScene = scenes[scenes.length - 1];\n        prevScene.endSeconds = currentScene.endSeconds;\n        prevScene.duration = prevScene.endSeconds - prevScene.startSeconds;\n        prevScene.text += ' ' + currentScene.text;\n      } else {\n        scenes.push(currentScene);\n      }\n    }\n    \n    currentScene = {\n      sceneIndex: scenes.length,\n      startSeconds: sub.startSeconds,\n      endSeconds: sub.endSeconds,\n      duration: duration,\n      text: sub.text,\n      gapBefore: pauseBefore,\n      // Track if this scene started after a natural pause\n      startedWithNaturalPause: isNaturalPause\n    };\n  } else {\n    currentScene.endSeconds = sub.endSeconds;\n    currentScene.duration = currentScene.endSeconds - currentScene.startSeconds;\n    currentScene.text += ' ' + sub.text;\n  }\n});\n\n// Push final scene\nif (currentScene) {\n  if (currentScene.duration >= MIN_SCENE_DURATION) {\n    scenes.push(currentScene);\n  } else if (scenes.length > 0) {\n    const prevScene = scenes[scenes.length - 1];\n    prevScene.endSeconds = currentScene.endSeconds;\n    prevScene.duration = prevScene.endSeconds - prevScene.startSeconds;\n    prevScene.text += ' ' + currentScene.text;\n  } else {\n    scenes.push(currentScene);\n  }\n}\n\n// Finalize scenes - determine breathing space based on NEXT scene's gap\nfor (let i = 0; i < scenes.length; i++) {\n  scenes[i].sceneIndex = i;\n  scenes[i].startTimeRaw = formatSRTTime(scenes[i].startSeconds);\n  scenes[i].endTimeRaw = formatSRTTime(scenes[i].endSeconds);\n  \n  // Check if NEXT scene starts with a natural pause\n  // If yes, THIS scene can have breathing space\n  // If no (next scene is zero-gap), THIS scene should NOT have breathing space\n  if (i < scenes.length - 1) {\n    const nextSceneGap = scenes[i + 1].gapBefore;\n    scenes[i].hasNaturalPause = nextSceneGap >= ZERO_GAP_THRESHOLD;\n  } else {\n    // Last scene always gets breathing space\n    scenes[i].hasNaturalPause = true;\n  }\n  \n  console.log(`Scene ${i}: ${scenes[i].duration.toFixed(1)}s, breath: ${scenes[i].hasNaturalPause ? 'YES' : 'NO'}, gap: ${(scenes[i].gapBefore || 0).toFixed(3)}s`);\n}\n\nconst totalDuration = scenes.length > 0 ? scenes[scenes.length - 1].endSeconds : 0;\n\n// Count scenes with/without breathing space\nconst withBreathing = scenes.filter(s => s.hasNaturalPause).length;\nconst withoutBreathing = scenes.filter(s => !s.hasNaturalPause).length;\n\nconsole.log(`\\n=== SUMMARY ===`);\nconsole.log(`Total scenes: ${scenes.length}`);\nconsole.log(`With breathing space: ${withBreathing}`);\nconsole.log(`Without breathing space (zero-gap): ${withoutBreathing}`);\nconsole.log(`Total duration: ${totalDuration.toFixed(2)}s`);\n\n// Add dialogue mapping\nconst imageDialogueMapping = scenes.map((scene, index) => ({\n  imageNumber: index + 1,\n  dialogue: scene.text.trim(),\n  duration: scene.duration.toFixed(2) + 's',\n  timestamp: `${scene.startTimeRaw} --> ${scene.endTimeRaw}`,\n  hasNaturalPause: scene.hasNaturalPause\n}));\n\nconst dialogueMappingText = imageDialogueMapping.map(item => \n  `${item.imageNumber}: ${item.dialogue}`\n).join('\\n');\n\nconsole.log('\\n=== DIALOGUE-TO-IMAGE MAPPING ===');\nconsole.log(dialogueMappingText);\nconsole.log(`\\nTotal Images Required: ${scenes.length}`);\n\nreturn {\n  json: {\n    scenes: scenes,\n    totalScenes: scenes.length,\n    totalDuration: totalDuration,\n    imageDialogueMapping: imageDialogueMapping,\n    dialogueMappingText: dialogueMappingText,\n    requiredImages: scenes.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6608,
+        -2912
+      ],
+      "id": "f3a03bec-dd54-47cd-894d-0411d5ea6a1d",
+      "name": "Scene Detection"
+    },
+    {
+      "parameters": {
+        "jsCode": "// SETUP: Create temp directory and prepare media file paths\nconst items = $input.all();\nconst tempDir = `/tmp/video_${Date.now()}`;\n\nreturn items.map((item, index) => {\n  const originalName = item.json.name || `file_${index}`;\n  const isVideo = /\\.(mp4|mov|avi|mkv|webm|flv|m4v)$/i.test(originalName);\n  const ext = isVideo ? 'mp4' : 'jpg';\n  const fileName = `media_${String(index).padStart(4, '0')}.${ext}`;\n  const filePath = `${tempDir}/${fileName}`;\n  \n  const binaryData = item.binary?.data || Object.values(item.binary || {})[0];\n  \n  if (!binaryData) {\n    throw new Error(`Item ${index} has no binary data`);\n  }\n  \n  return {\n    json: {\n      tempDir: tempDir,\n      mediaIndex: index,\n      originalName: originalName,\n      isVideo: isVideo,\n      fileName: fileName,\n      filePath: filePath\n    },\n    binary: {\n      data: binaryData\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5488,
+        -3072
+      ],
+      "id": "f9b7ac2c-1be6-4d98-8453-c19ccea80612",
+      "name": "Prepare Media Paths"
+    },
+    {
+      "parameters": {
+        "command": "=mkdir -p {{ $json.tempDir }} && echo 'Created {{ $json.tempDir }}'"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -5264,
+        -3072
+      ],
+      "id": "9fdd0933-7896-434c-a0fb-408a59cff469",
+      "name": "Create Temp Directory"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass through original data after temp dir created\nreturn $('Prepare Media Paths').all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5040,
+        -3072
+      ],
+      "id": "a899cc0a-fa19-4a11-abbe-1c8d29517755",
+      "name": "Restore Media Data"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.filePath }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -4816,
+        -3072
+      ],
+      "id": "78e89a0c-ff6c-4c40-92c1-9bedbe0b2b62",
+      "name": "Write Media to Disk"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -4592,
+        -3072
+      ],
+      "id": "8bb23db0-6a70-418f-80d3-e90dc2f112a0",
+      "name": "Aggregate Media Info"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -6160,
+        -2912
+      ],
+      "id": "06a1444e-93dc-4029-8e8c-e48b0e5a5309",
+      "name": "Merge Media + Scenes"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PREPARE VOICEOVER: Write voiceover to disk\nconst items = $input.all();\n\n// Find tempDir from media data\nlet tempDir = null;\nfor (const item of items) {\n  if (item.json.data && Array.isArray(item.json.data) && item.json.data[0]?.tempDir) {\n    tempDir = item.json.data[0].tempDir;\n    break;\n  }\n}\n\nif (!tempDir) {\n  throw new Error('Could not find tempDir from media data');\n}\n\n// Get voiceover binary\nconst voiceoverNode = $('Download Voiceover').first();\nconst voiceoverBinary = voiceoverNode.binary?.voiceover || voiceoverNode.binary?.data || Object.values(voiceoverNode.binary || {})[0];\n\nif (!voiceoverBinary) {\n  throw new Error('Voiceover binary not found');\n}\n\nreturn {\n  json: {\n    tempDir: tempDir,\n    voiceoverPath: `${tempDir}/voiceover_full.mp3`\n  },\n  binary: {\n    voiceover: voiceoverBinary\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5936,
+        -2912
+      ],
+      "id": "6fd6bd33-f240-4133-b0e0-38553d39fa44",
+      "name": "Prepare Voiceover"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.voiceoverPath }}",
+        "dataPropertyName": "voiceover",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -5712,
+        -2912
+      ],
+      "id": "8dd70d52-c3e4-44b7-93bf-77aed5936660",
+      "name": "Write Voiceover"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CREATE ATOMIC ITEMS: One item per scene with all data needed\n\n// Get scenes from Scene Detection node directly\nlet scenes = null;\ntry {\n  const sceneNode = $('Scene Detection').first();\n  if (sceneNode && sceneNode.json.scenes) {\n    scenes = sceneNode.json.scenes;\n  }\n} catch (e) {\n  console.log('Could not get scenes from Scene Detection node');\n}\n\n// Get media items from Aggregate Media Info or Write Media to Disk\nlet mediaItems = null;\nlet tempDir = null;\n\ntry {\n  const aggregateNode = $('Aggregate Media Info').first();\n  if (aggregateNode && aggregateNode.json.data) {\n    mediaItems = aggregateNode.json.data;\n    tempDir = mediaItems[0]?.tempDir;\n  }\n} catch (e) {\n  console.log('Could not get media from Aggregate Media Info');\n}\n\n// Fallback: try to get from input\nif (!mediaItems) {\n  const inputItems = $input.all();\n  for (const item of inputItems) {\n    if (item.json.data && Array.isArray(item.json.data)) {\n      mediaItems = item.json.data;\n      tempDir = item.json.data[0]?.tempDir;\n      break;\n    }\n  }\n}\n\n// Another fallback: build from Write Media to Disk\nif (!mediaItems) {\n  try {\n    const writeMediaItems = $('Write Media to Disk').all();\n    if (writeMediaItems && writeMediaItems.length > 0) {\n      mediaItems = writeMediaItems.map(item => ({\n        tempDir: item.json.tempDir,\n        filePath: item.json.fileName,\n        isVideo: item.json.isVideo || false,\n        originalName: item.json.originalName || item.json.fileName\n      }));\n      tempDir = writeMediaItems[0].json.tempDir;\n    }\n  } catch (e) {\n    console.log('Could not get from Write Media to Disk');\n  }\n}\n\nif (!scenes) {\n  throw new Error('Could not find scenes data. Check Scene Detection node output.');\n}\n\nif (!mediaItems || !tempDir) {\n  throw new Error(`Missing data: scenes=${!!scenes}, media=${!!mediaItems}, tempDir=${!!tempDir}`);\n}\n\nconst totalScenes = scenes.length;\nconst totalMedia = mediaItems.length;\n\nconsole.log(`Scenes: ${totalScenes}, Media files: ${totalMedia}`);\n\nif (totalMedia < totalScenes) {\n  throw new Error(`NOT ENOUGH MEDIA! Need ${totalScenes}, have ${totalMedia}`);\n}\n\nif (totalMedia > totalScenes) {\n  throw new Error(`TOO MANY MEDIA FILES! Need ${totalScenes}, have ${totalMedia}`);\n}\n\n// Get Airtable settings for subtitles\nlet airtableRecord = {};\ntry {\n  airtableRecord = $('Search Pending Records').first().json;\n} catch (e) {}\n\nconst subtitlesEnabled = airtableRecord['Subtitles Enabled'] === true;\nconst subtitleFont = airtableRecord['Subtitle Font'] || 'Arial';\nconst subtitleFontSize = airtableRecord['Subtitle Font Size'] || 36;\nconst subtitleFontColor = airtableRecord['Subtitle Font Color'] || '#FFFFFF';\nconst subtitleBgColor = airtableRecord['Subtitle Background Color'] || '#000000DD';\nconst subtitlePosition = airtableRecord['Subtitle Position'] || 'bottom';\nconst subtitleOutline = airtableRecord['Subtitle Outline'] !== undefined ? airtableRecord['Subtitle Outline'] : 2;\nconst fontUrl = airtableRecord['Subtitle Font URL'] || null;\n\n// Get voiceover path\nlet voiceoverPath = null;\ntry {\n  voiceoverPath = $('Write Voiceover').first().json.fileName;\n} catch (e) {\n  voiceoverPath = `${tempDir}/voiceover_full.mp3`;\n}\n\n// Create one item per scene\nconst atomicItems = scenes.map((scene, index) => {\n  const media = mediaItems[index];\n  \n  return {\n    json: {\n      // Scene info\n      sceneIndex: index,\n      startSeconds: scene.startSeconds,\n      endSeconds: scene.endSeconds,\n      calculatedDuration: scene.duration,\n      sceneText: scene.text,\n      startTimeRaw: scene.startTimeRaw,\n      endTimeRaw: scene.endTimeRaw,\n      hasNaturalPause: scene.hasNaturalPause, // NEW: For conditional breathing space\n      \n      // Media info\n      mediaPath: media.filePath,\n      isVideo: media.isVideo || false,\n      originalName: media.originalName,\n      \n      // Paths\n      tempDir: tempDir,\n      voiceoverPath: voiceoverPath,\n      audioSegmentPath: `${tempDir}/audio_${String(index).padStart(4, '0')}.mp3`,\n      subtitlePath: `${tempDir}/sub_${String(index).padStart(4, '0')}.srt`,\n      clipOutputPath: `${tempDir}/clip_${String(index).padStart(4, '0')}.mp4`,\n      \n      // Subtitle settings\n      subtitlesEnabled: subtitlesEnabled,\n      subtitleFont: subtitleFont,\n      subtitleFontSize: subtitleFontSize,\n      subtitleFontColor: subtitleFontColor,\n      subtitleBgColor: subtitleBgColor,\n      subtitlePosition: subtitlePosition,\n      subtitleOutline: subtitleOutline,\n      fontUrl: fontUrl,\n      \n      // Totals\n      totalScenes: totalScenes\n    }\n  };\n});\n\n// Log breathing space summary\nconst withBreathing = atomicItems.filter(i => i.json.hasNaturalPause).length;\nconst withoutBreathing = atomicItems.filter(i => !i.json.hasNaturalPause).length;\nconsole.log(`Created ${atomicItems.length} atomic items`);\nconsole.log(`  - ${withBreathing} will have breathing space`);\nconsole.log(`  - ${withoutBreathing} will have NO breathing space (zero-gap)`);\n\nreturn atomicItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5488,
+        -2912
+      ],
+      "id": "24dc4d5c-eea5-425e-8b0a-3a13bff6d174",
+      "name": "Create Atomic Items"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5264,
+        -2912
+      ],
+      "id": "ad72713d-e4f2-4834-86fc-d9fffac8f89d",
+      "name": "Loop Each Scene"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 1: Extract audio segment for this scene\nconst item = $input.first().json;\n\n// Use original start time (no offset needed with new scene detection logic)\nconst startTime = item.startSeconds;\nconst duration = item.calculatedDuration;\n\nconst extractCmd = `ffmpeg -y -i \"${item.voiceoverPath}\" -ss ${startTime.toFixed(3)} -t ${duration.toFixed(3)} -c:a libmp3lame -q:a 2 \"${item.audioSegmentPath}\"`;\n\nconsole.log(`Scene ${item.sceneIndex}: Extracting audio (${startTime.toFixed(2)}s - ${item.endSeconds.toFixed(2)}s)`);\n\nreturn {\n  json: {\n    ...item,\n    extractAudioCmd: extractCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7056,
+        -2768
+      ],
+      "id": "1514120d-368e-4b49-93d5-7cc1fd14ed5d",
+      "name": "1. Build Extract Audio Cmd"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.extractAudioCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -6832,
+        -2768
+      ],
+      "id": "ef6d20e4-d85d-4bfd-8db5-91ef827edb7d",
+      "name": "1. Extract Audio"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 2: Probe audio duration\nconst item = $('1. Build Extract Audio Cmd').first().json;\n\nconst probeCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"${item.audioSegmentPath}\"`;\n\nreturn {\n  json: {\n    ...item,\n    probeCmd: probeCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6608,
+        -2768
+      ],
+      "id": "e338d4f2-e6b5-4b15-ab95-d6a82913745d",
+      "name": "2. Build Probe Cmd"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.probeCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -6384,
+        -2768
+      ],
+      "id": "f8c8c1e2-952e-4b28-8f7d-af83098cd3a7",
+      "name": "2. Probe Duration"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 3: Create per-clip SRT file\nconst item = $('2. Build Probe Cmd').first().json;\nconst probeResult = $input.first().json;\n\n// Get actual duration from probe\nconst actualDuration = parseFloat(probeResult.stdout.trim());\n\nif (isNaN(actualDuration) || actualDuration <= 0) {\n  throw new Error(`Invalid duration: ${probeResult.stdout}`);\n}\n\nconsole.log(`Scene ${item.sceneIndex}: Probed duration = ${actualDuration.toFixed(4)}s`);\n\n// Create SRT content for this clip (starts at 0, ends at actual duration)\nfunction formatSRTTime(seconds) {\n  const hrs = Math.floor(seconds / 3600);\n  const mins = Math.floor((seconds % 3600) / 60);\n  const secs = Math.floor(seconds % 60);\n  const ms = Math.floor((seconds % 1) * 1000);\n  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;\n}\n\n// SRT for this clip starts at 00:00:00,000\nconst srtContent = `1\n00:00:00,000 --> ${formatSRTTime(actualDuration)}\n${item.sceneText}\n`;\n\n// Write SRT file command\nconst writeSrtCmd = `cat > \"${item.subtitlePath}\" << 'SRTEOF'\n${srtContent}\nSRTEOF`;\n\nreturn {\n  json: {\n    ...item,\n    actualDuration: actualDuration,\n    srtContent: srtContent,\n    writeSrtCmd: writeSrtCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6160,
+        -2768
+      ],
+      "id": "2621e8e5-c4f8-4bd9-94b0-afac81c79632",
+      "name": "3. Build SRT Content"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.writeSrtCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -5936,
+        -2768
+      ],
+      "id": "4f25b0ab-da4b-41e1-8642-40d3d6e44def",
+      "name": "3. Write SRT File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 4: Build FFmpeg command - WORKING ZOOM with CONDITIONAL BREATHING SPACE\n\nconst item = $('3. Build SRT Content').first().json;\n\nconst audioDuration = item.actualDuration;\nconst isVideo = item.isVideo;\nconst mediaPath = item.mediaPath;\nconst audioPath = item.audioSegmentPath;\nconst subtitlePath = item.subtitlePath;\nconst outputPath = item.clipOutputPath;\n\n// CONDITIONAL BREATHING SPACE - only add if natural pause follows\nconst hasNaturalPause = item.hasNaturalPause !== false; // Default true for safety\nconst BREATHING_SPACE = hasNaturalPause ? 0.4 : 0;\nconst totalDuration = audioDuration + BREATHING_SPACE;\n\n// Subtitle styling\nconst subtitlesEnabled = item.subtitlesEnabled;\nconst subtitleFont = item.subtitleFont || 'Arial';\nconst subtitleFontSize = item.subtitleFontSize || 36;\nconst subtitleFontColor = item.subtitleFontColor || '#FFFFFF';\nconst subtitleBgColor = item.subtitleBgColor || '#000000';\nconst subtitlePosition = item.subtitlePosition || 'bottom';\nconst subtitleOutline = item.subtitleOutline || 2;\n\nfunction hexToAss(hex) {\n  hex = (hex || '#FFFFFF').replace('#', '').toUpperCase();\n  if (hex.length >= 6) {\n    const r = hex.substring(0, 2);\n    const g = hex.substring(2, 4);\n    const b = hex.substring(4, 6);\n    return `&H00${b}${g}${r}&`;\n  }\n  return '&H00FFFFFF&';\n}\n\nconst assFont = hexToAss(subtitleFontColor);\nconst assBg = hexToAss(subtitleBgColor);\n\nlet alignment = 2;\nif (subtitlePosition === 'top') alignment = 8;\nif (subtitlePosition === 'center') alignment = 5;\n\nlet subtitlePart = '';\nif (subtitlesEnabled) {\n  subtitlePart = `,subtitles=${subtitlePath}:force_style='FontName=${subtitleFont},FontSize=${subtitleFontSize},PrimaryColour=${assFont},BackColour=${assBg},BorderStyle=4,Outline=${subtitleOutline},Shadow=2,Alignment=${alignment},MarginV=50'`;\n}\n\nlet ffmpegCmd;\n\nif (isVideo) {\n  // VIDEO: No zoom, scale + crop + audio\n  // Use apad only if breathing space > 0, otherwise use anull\n  const audioPad = BREATHING_SPACE > 0 ? `apad=pad_dur=${BREATHING_SPACE}` : 'anull';\n  ffmpegCmd = `ffmpeg -y -loglevel error -i \"${mediaPath}\" -i \"${audioPath}\" -filter_complex \"[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080${subtitlePart}[v];[1:a]${audioPad}[a]\" -map \"[v]\" -map \"[a]\" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 192k -t ${totalDuration} \"${outputPath}\"`;\n} else {\n  // IMAGE: WORKING ZOOM from old workflow\n  // Zoom settings: 0-5% based on duration\n  const zoomPercent = Math.min(totalDuration * 1, 5);\n  const zoomDirection = item.sceneIndex % 2 === 0 ? 'in' : 'out';\n  \n  const startZoom = zoomDirection === 'in' ? 1.0 : (1.0 + zoomPercent/100);\n  const endZoom = zoomDirection === 'in' ? (1.0 + zoomPercent/100) : 1.0;\n  \n  // EXACT format from working old workflow\n  const zoomFilter = `zoompan=z='${startZoom}+(${endZoom}-${startZoom})*on/(${totalDuration}*30)':d=${totalDuration}*30:s=1920x1080:fps=30`;\n  \n  // Use apad only if breathing space > 0, otherwise use anull\n  const audioPad = BREATHING_SPACE > 0 ? `apad=pad_dur=${BREATHING_SPACE}` : 'anull';\n  ffmpegCmd = `ffmpeg -y -loglevel error -loop 1 -framerate 30 -i \"${mediaPath}\" -i \"${audioPath}\" -filter_complex \"[0:v]scale=1920x1080:force_original_aspect_ratio=increase,crop=1920:1080,${zoomFilter},setpts=PTS-STARTPTS${subtitlePart}[v];[1:a]${audioPad}[a]\" -map \"[v]\" -map \"[a]\" -t ${totalDuration} -r 30 -pix_fmt yuv420p -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 192k \"${outputPath}\"`;\n}\n\nconsole.log(`Scene ${item.sceneIndex}: ${isVideo ? 'VIDEO' : 'IMAGE+ZOOM'} - ${totalDuration.toFixed(2)}s (audio: ${audioDuration.toFixed(2)}s, breath: ${BREATHING_SPACE}s, naturalPause: ${hasNaturalPause})`);\n\nreturn {\n  json: {\n    ...item,\n    ffmpegCmd: ffmpegCmd,\n    totalDuration: totalDuration\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5712,
+        -2768
+      ],
+      "id": "1164e464-4039-4722-b42d-58da0ce41e79",
+      "name": "4. Build Clip Command"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.ffmpegCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -5488,
+        -2768
+      ],
+      "id": "f3823bde-1c1e-4404-ab48-a5f6095ddc71",
+      "name": "4. Render Complete Clip"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass data back to loop\nconst item = $('4. Build Clip Command').first().json;\n\nconsole.log(`Scene ${item.sceneIndex}: Clip rendered successfully`);\n\nreturn {\n  json: item\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5264,
+        -2768
+      ],
+      "id": "fb792123-247a-453d-8690-405c45d8690a",
+      "name": "Continue Loop"
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD CONCAT LIST after all clips rendered\nconst atomicItems = $('Create Atomic Items').all();\n\nconst tempDir = atomicItems[0].json.tempDir;\nconst totalScenes = atomicItems[0].json.totalScenes;\n\n// Get music file ID from Airtable (passed through atomic items or get directly)\nlet musicFileId = null;\ntry {\n  musicFileId = $('Search Pending Records').first().json['Music File ID'];\n} catch (e) {\n  console.log('Could not get Music File ID from Search Pending Records');\n}\n\n// Build concat file content\nconst concatLines = [];\nfor (let i = 0; i < totalScenes; i++) {\n  concatLines.push(`file 'clip_${String(i).padStart(4, '0')}.mp4'`);\n}\n\nconst videosContent = concatLines.join('\\n');\nconst videosPath = `${tempDir}/videos.txt`;\n\nconsole.log(`Building concat list with ${totalScenes} clips`);\nconsole.log(`Music File ID: ${musicFileId}`);\n\nreturn {\n  json: {\n    tempDir: tempDir,\n    videosContent: videosContent,\n    videosPath: videosPath,\n    totalScenes: totalScenes,\n    musicFileId: musicFileId\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5040,
+        -2912
+      ],
+      "id": "b2591102-974b-45db-b99f-2ef0512f0450",
+      "name": "Build Concat List"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create binary for videos.txt\nconst item = $input.first();\nconst buffer = Buffer.from(item.json.videosContent, 'utf8');\n\nreturn {\n  json: item.json,\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'videos.txt'\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4816,
+        -2912
+      ],
+      "id": "b78d7e35-e4d5-432c-9c8c-f832d0b6c6d1",
+      "name": "Create Concat Binary"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.videosPath }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -4592,
+        -2912
+      ],
+      "id": "29c5fe57-74f8-43cd-aea2-3bb27aa545af",
+      "name": "Write videos.txt"
+    },
+    {
+      "parameters": {
+        "command": "=cd \"{{ $json.tempDir }}\" && ffmpeg -y -f concat -safe 0 -i \"videos.txt\" -c copy \"final_no_music.mp4\" && echo \"Concatenation complete\""
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -5040,
+        -2768
+      ],
+      "id": "018a9669-2423-4eed-8843-3acab61b4834",
+      "name": "Concatenate All Clips"
+    },
+    {
+      "parameters": {
+        "url": "=https://drive.google.com/uc?export=download&id={{ $('Write videos.txt').item.json.musicFileId }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "music"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -4816,
+        -2768
+      ],
+      "id": "9b684e07-6416-468a-9399-5046b51ce69c",
+      "name": "Get Background Music",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare for final assembly with optional music\nconst concatData = $('Write videos.txt').first().json;\nconst tempDir = concatData.tempDir;\n\n// Check for music\nlet musicBinary = null;\nlet hasMusic = false;\n\ntry {\n  const musicNode = $('Get Background Music').first();\n  if (musicNode?.binary) {\n    musicBinary = musicNode.binary.music || musicNode.binary.data || Object.values(musicNode.binary)[0];\n    hasMusic = !!musicBinary;\n  }\n} catch (e) {\n  console.log('No music available');\n}\n\nconst result = {\n  json: {\n    tempDir: tempDir,\n    hasMusic: hasMusic,\n    musicPath: `${tempDir}/music.mp3`,\n    concatenatedPath: `${tempDir}/final_no_music.mp4`,\n    finalOutputPath: `${tempDir}/final_video.mp4`\n  },\n  binary: {}\n};\n\nif (hasMusic && musicBinary) {\n  result.binary.music = musicBinary;\n}\n\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4592,
+        -2768
+      ],
+      "id": "8622891f-6f56-47ef-9317-45498ac764ae",
+      "name": "Prepare Final Assembly"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "music-check",
+              "leftValue": "={{ $json.hasMusic }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -7056,
+        -2624
+      ],
+      "id": "6562aa6f-0d60-4f6f-96ea-9f924bc07e3d",
+      "name": "Has Music?"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.musicPath }}",
+        "dataPropertyName": "music",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -6832,
+        -2624
+      ],
+      "id": "6a4b353e-38cb-4315-8367-82a348948dfe",
+      "name": "Write Music File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build command to add background music\nconst item = $input.first().json;\n\nconst addMusicCmd = `ffmpeg -y -i \"${item.concatenatedPath}\" -i \"${item.musicPath}\" -filter_complex \"[1:a]aloop=loop=-1:size=2e+09,volume=0.1[music];[0:a][music]amix=inputs=2:duration=first[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac -b:a 192k \"${item.finalOutputPath}\"`;\n\nreturn {\n  json: {\n    ...item,\n    addMusicCmd: addMusicCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6608,
+        -2624
+      ],
+      "id": "afeaee7f-8978-4870-89a5-3ee16d3526dd",
+      "name": "Build Add Music Cmd"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.addMusicCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -6384,
+        -2624
+      ],
+      "id": "c0fab777-a3ad-4594-b55f-4bc318ca0fbc",
+      "name": "Add Background Music"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No music - just copy concatenated to final\nconst item = $input.first().json;\n\nconst copyCmd = `cp \"${item.concatenatedPath}\" \"${item.finalOutputPath}\"`;\n\nreturn {\n  json: {\n    ...item,\n    copyCmd: copyCmd\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6832,
+        -2480
+      ],
+      "id": "e5f5aee6-33c8-490e-90f5-c10897906d34",
+      "name": "No Music - Copy"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.copyCmd }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -6608,
+        -2480
+      ],
+      "id": "bf9c7ffd-bb48-41fe-a888-c1333377c2fc",
+      "name": "Copy Final"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get final output path\nconst items = $input.all();\n\nlet finalOutputPath = null;\nlet tempDir = null;\n\nfor (const item of items) {\n  if (item.json.finalOutputPath) {\n    finalOutputPath = item.json.finalOutputPath;\n    tempDir = item.json.tempDir;\n    break;\n  }\n}\n\nif (!finalOutputPath) {\n  throw new Error('Could not find final output path');\n}\n\nreturn {\n  json: {\n    finalOutputPath: finalOutputPath,\n    tempDir: tempDir\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5936,
+        -2624
+      ],
+      "id": "ce8a7d1f-8145-4515-b5d4-816270089cba",
+      "name": "Get Final Path"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.finalOutputPath }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -5712,
+        -2624
+      ],
+      "id": "c23b62f5-f407-40ad-8853-f3f7b4245df3",
+      "name": "Read Final Video"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare for upload\nconst recordName = $('Search Pending Records').first().json.Name || 'video';\nconst timestamp = Date.now();\nconst fileName = `${recordName}_${timestamp}.mp4`;\nconst tempDir = $('Get Final Path').first().json.tempDir;\n\nreturn {\n  json: {\n    fileName: fileName,\n    tempDir: tempDir\n  },\n  binary: $input.first().binary\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5488,
+        -2624
+      ],
+      "id": "172c17a2-fdd8-49ff-ab24-a8d2641c6a1a",
+      "name": "Prepare Upload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $json.fileName }}\",\n  \"parents\": [\"1qEYLvvReHfzWGoy91jCpx99wuefS1pnk\"]\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -5264,
+        -2624
+      ],
+      "id": "45683d67-1701-48a2-9b26-c1361b1603f0",
+      "name": "Get Upload URL",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const uploadUrl = $input.first().json.headers.location;\nconst binaryData = $('Prepare Upload').first().binary;\n\nreturn {\n  json: { uploadUrl: uploadUrl },\n  binary: binaryData\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5040,
+        -2624
+      ],
+      "id": "923cf559-dc60-49e0-90b8-b3ed21e2a328",
+      "name": "Prep Upload Binary"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.uploadUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "video/mp4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -4816,
+        -2624
+      ],
+      "id": "5ed3d8b6-3e18-4a20-9b6f-9588ea7720a3",
+      "name": "Upload Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/permissions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"role\": \"reader\",\n  \"type\": \"anyone\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -4592,
+        -2624
+      ],
+      "id": "174a8a6d-4c93-45de-9449-7392ef61614e",
+      "name": "Set Public Permissions",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const recordId = $('Search Pending Records').first().json.id;\nconst fileId = $('Upload Video').first().json.id;\nconst outputUrl = `https://drive.google.com/file/d/${fileId}/view`;\n\nreturn {\n  json: {\n    id: recordId,\n    'Status': 'Complete',\n    'Output URL': outputUrl\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5040,
+        -2480
+      ],
+      "id": "4a1d46a2-e30c-4a57-af80-cf2315b9cad5",
+      "name": "Prepare Airtable Update"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appTI2ZOHmYYoCd4g",
+          "mode": "list",
+          "cachedResultName": "Video Automation",
+          "cachedResultUrl": "https://airtable.com/appTI2ZOHmYYoCd4g"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl1nDvreMUON4Vu4",
+          "mode": "list",
+          "cachedResultName": "Videos",
+          "cachedResultUrl": "https://airtable.com/appTI2ZOHmYYoCd4g/tbl1nDvreMUON4Vu4"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Output URL",
+              "displayName": "Output URL",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -4816,
+        -2480
+      ],
+      "id": "ba4f9b27-eb70-4f0d-93f3-5e9400ff07cb",
+      "name": "Update Airtable",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "sfvRD1bBBp1Woi28",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=rm -rf {{ $('Get Final Path').first().json.tempDir }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -4592,
+        -2480
+      ],
+      "id": "ad9d390a-e720-4e35-8e6c-3d3f0353171b",
+      "name": "Cleanup Temp Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get data from whichever branch executed\nlet finalOutputPath = null;\nlet tempDir = null;\n\n// Try to get from \"Add Background Music\" (music path)\ntry {\n  const musicResult = $('Add Background Music').first();\n  if (musicResult?.json) {\n    finalOutputPath = musicResult.json.finalOutputPath;\n    tempDir = musicResult.json.tempDir;\n  }\n} catch (e) {}\n\n// If not found, try \"Copy Final\" (no music path)\nif (!finalOutputPath) {\n  try {\n    const copyResult = $('Copy Final').first();\n    if (copyResult?.json) {\n      finalOutputPath = copyResult.json.finalOutputPath;\n      tempDir = copyResult.json.tempDir;\n    }\n  } catch (e) {}\n}\n\n// Fallback - get from Prepare Final Assembly\nif (!finalOutputPath) {\n  const prepResult = $('Prepare Final Assembly').first();\n  finalOutputPath = prepResult.json.finalOutputPath;\n  tempDir = prepResult.json.tempDir;\n}\n\nreturn {\n  json: {\n    finalOutputPath: finalOutputPath,\n    tempDir: tempDir\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6160,
+        -2624
+      ],
+      "id": "31e48171-df94-4e0e-af4d-a04c9c925448",
+      "name": "Merge Final Paths"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all scenes from the input\nconst scenes = $input.first().json.scenes;\n\n// Extract text from all scenes\nconst allTexts = scenes.map(scene => scene.text).join('\\n\\n');\n\n// Or if you want them as separate items\nreturn scenes.map(scene => ({\n  json: {\n    text: scene.text\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6384,
+        -2912
+      ],
+      "id": "e5818227-8451-4050-a078-8beb33ad7866",
+      "name": "Dialogues for Prompts"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Search Pending Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Pending Records": {
+      "main": [
+        [
+          {
+            "node": "Get Media List from Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Media List from Drive": {
+      "main": [
+        [
+          {
+            "node": "Split Media Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Generate SRT (Whisper)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate SRT (Whisper)": {
+      "main": [
+        [
+          {
+            "node": "Scene Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Media Files": {
+      "main": [
+        [
+          {
+            "node": "Sort Media Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Media Files": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Pause": {
+      "main": [
+        [
+          {
+            "node": "Download Media Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Media Files": {
+      "main": [
+        [
+          {
+            "node": "Prepare Media Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Media Paths": {
+      "main": [
+        [
+          {
+            "node": "Create Temp Directory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Temp Directory": {
+      "main": [
+        [
+          {
+            "node": "Restore Media Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Media Data": {
+      "main": [
+        [
+          {
+            "node": "Write Media to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Media to Disk": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Media Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Media Info": {
+      "main": [
+        [
+          {
+            "node": "Merge Media + Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scene Detection": {
+      "main": [
+        [
+          {
+            "node": "Dialogues for Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Media + Scenes": {
+      "main": [
+        [
+          {
+            "node": "Prepare Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Write Voiceover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Voiceover": {
+      "main": [
+        [
+          {
+            "node": "Create Atomic Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Atomic Items": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Scene",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Each Scene": {
+      "main": [
+        [
+          {
+            "node": "Build Concat List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "1. Build Extract Audio Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Build Extract Audio Cmd": {
+      "main": [
+        [
+          {
+            "node": "1. Extract Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Extract Audio": {
+      "main": [
+        [
+          {
+            "node": "2. Build Probe Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Build Probe Cmd": {
+      "main": [
+        [
+          {
+            "node": "2. Probe Duration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Probe Duration": {
+      "main": [
+        [
+          {
+            "node": "3. Build SRT Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Build SRT Content": {
+      "main": [
+        [
+          {
+            "node": "3. Write SRT File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Write SRT File": {
+      "main": [
+        [
+          {
+            "node": "4. Build Clip Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Build Clip Command": {
+      "main": [
+        [
+          {
+            "node": "4. Render Complete Clip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Render Complete Clip": {
+      "main": [
+        [
+          {
+            "node": "Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Loop": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Scene",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Concat List": {
+      "main": [
+        [
+          {
+            "node": "Create Concat Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Concat Binary": {
+      "main": [
+        [
+          {
+            "node": "Write videos.txt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write videos.txt": {
+      "main": [
+        [
+          {
+            "node": "Concatenate All Clips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concatenate All Clips": {
+      "main": [
+        [
+          {
+            "node": "Get Background Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Background Music": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Assembly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Assembly": {
+      "main": [
+        [
+          {
+            "node": "Has Music?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Music?": {
+      "main": [
+        [
+          {
+            "node": "Write Music File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Music - Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Music File": {
+      "main": [
+        [
+          {
+            "node": "Build Add Music Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Add Music Cmd": {
+      "main": [
+        [
+          {
+            "node": "Add Background Music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Background Music": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Music - Copy": {
+      "main": [
+        [
+          {
+            "node": "Copy Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copy Final": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Final Path": {
+      "main": [
+        [
+          {
+            "node": "Read Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Final Video": {
+      "main": [
+        [
+          {
+            "node": "Prepare Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Upload": {
+      "main": [
+        [
+          {
+            "node": "Get Upload URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Upload URL": {
+      "main": [
+        [
+          {
+            "node": "Prep Upload Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Upload Binary": {
+      "main": [
+        [
+          {
+            "node": "Upload Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Video": {
+      "main": [
+        [
+          {
+            "node": "Set Public Permissions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Public Permissions": {
+      "main": [
+        [
+          {
+            "node": "Prepare Airtable Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Airtable Update": {
+      "main": [
+        [
+          {
+            "node": "Update Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Airtable": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Temp Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Final Paths": {
+      "main": [
+        [
+          {
+            "node": "Get Final Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dialogues for Prompts": {
+      "main": [
+        [
+          {
+            "node": "Merge Media + Scenes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "aa709acd-2bef-4096-a23d-bb4ff6e20e9e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "510dc0afdd5ec9c3843be833c714a2623974a2058ec95eb59daf867d1c4b0dcb"
+  },
+  "id": "L1p5woCfSwvGUhzc",
+  "tags": []
+}
